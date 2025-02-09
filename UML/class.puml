@@ -1,0 +1,89 @@
+@startuml
+
+' Class definitions
+class Admin {
+  - adminID: String
+  - name: String
+  - email: String
+  + createOffer(): void
+  + updateOffer(): void
+  + manageProfile(): void
+}
+
+class Entrepreneur {
+  - entrepreneurID: String
+  - name: String
+  - email: String
+  + createSubmission(): void
+  + viewProfile(): void
+  + searchOffers(): void
+  + viewSubmissionStatus(): void
+}
+
+class Miner {
+  - minerID: String
+  - name: String
+  + validateOffer(): void
+  + validateSubmission(): void
+  + validateProfile(): void
+}
+
+class BlockchainService {
+  - blockchainID: String
+  + pushOffer(): void
+  + pushProfile(): void
+  + pushSubmission(): void
+  + pushOfferUpdate(): void
+}
+
+class Offer {
+  - offerID: String
+  - title: String
+  - description: String
+  - deadline: Date
+  - conditions: String
+  - status: String
+  + createOffer(): void
+  + updateOffer(): void
+  + validateOffer(): void
+}
+
+class Profile {
+  - profileID: String
+  - ownerID: String
+  - details: String
+  + createProfile(): void
+  + viewProfile(): void
+  + validateProfile(): void
+}
+
+class Submission {
+  - submissionID: String
+  - entrepreneurID: String
+  - offerID: String
+  - status: String
+  + createSubmission(): void
+  + validateSubmission(): void
+  + viewSubmissionStatus(): void
+}
+
+' Relationships
+Admin --|> Entrepreneur: "Manages"
+Admin --|> Offer: "Creates and Updates"
+Admin --|> Profile: "Manages"
+Entrepreneur --|> Offer: "Submits"
+Entrepreneur --|> Submission: "Creates"
+Entrepreneur --|> Profile: "Views"
+Miner --|> Offer: "Validates"
+Miner --|> Submission: "Validates"
+Miner --|> Profile: "Validates"
+BlockchainService --|> Offer: "Pushes"
+BlockchainService --|> Profile: "Pushes"
+BlockchainService --|> Submission: "Pushes"
+
+Offer --|> Submission: "Associated with"
+Profile --|> Entrepreneur: "Belongs to"
+Profile --|> Admin: "Manages"
+
+@enduml
+

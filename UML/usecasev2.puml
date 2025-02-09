@@ -1,0 +1,72 @@
+@startuml
+
+left to right direction
+
+actor "System Administrator" as Admin
+actor "Entrepreneur" as Entrepreneur
+actor "Expert" as Expert
+rectangle "Blockchain" as Blockchain <<external system>>
+
+
+    usecase "Create Contract" as CreateContract
+    usecase "Browse Contracts" as BrowseContracts
+    usecase "Update Contract" as UpdateContract
+    usecase "Set Contract Deadline" as OfferDeadline
+    usecase "Attach Documentation" as OfferDocs
+    usecase "Define Contract Conditions" as OfferConditions
+
+    usecase "Manage Users" as CRUDUser
+    usecase "Attach Certificates" as UserCertificates
+
+    usecase "Submit Bid" as SubmitBid
+    usecase "Withdraw Bid" as WithdrawBid
+    usecase "View Bid Rank" as ViewRank
+
+    usecase "Validate Bid" as ValidateBid
+    usecase "Validate Contract" as ValidateContract
+    usecase "Classify Bids" as ClassifyBids
+
+    usecase "Push Contract" as PushContract
+    usecase "Push Profile" as PushProfile
+    usecase "Push Submission" as PushBid
+
+' Admin connections
+Admin --> CreateContract
+Admin --> UpdateContract
+Admin --> CRUDUser
+
+' Entrepreneur connections
+Entrepreneur --> SubmitBid
+Entrepreneur --> WithdrawBid
+Entrepreneur --> BrowseContracts
+Entrepreneur --> ViewRank
+
+' Expert connections
+Expert --> ValidateBid
+Expert -right-> ValidateContract
+
+' Blockchain connection
+PushContract <-- Blockchain
+PushProfile <-- Blockchain
+PushBid <-- Blockchain
+
+' use case relations
+CreateContract .> ValidateContract : <<include>>
+CreateContract ..> OfferDeadline : <<include>>
+CreateContract ..> OfferDocs : <<include>>
+CreateContract ..> OfferConditions: <<include>>
+
+UpdateContract ..> ValidateContract : <<include>>
+
+CRUDUser <.. UserCertificates : <<extend>>
+
+SubmitBid ..> ValidateBid : <<include>>
+
+
+ValidateContract ..> PushContract : <<include>>
+ValidateBid ..> PushBid : <<include>>
+ValidateBid ..> ClassifyBids : <<include>>
+CRUDUser ..> PushProfile : <<include>>
+
+
+@enduml

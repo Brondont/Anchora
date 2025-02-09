@@ -1,0 +1,109 @@
+@startuml
+left to right direction
+
+' Define Actors
+actor "System Administrator" as Admin
+actor "Entrepreneur" as Entrepreneur
+actor "Industry Expert" as Expert
+actor "Corporate Representative" as CorporateUser
+
+' Define External Service
+rectangle "Blockchain Service" as Blockchain <<external system>>
+
+' Grouping Use Cases into Logical Packages
+package "Platform Management" {
+  ' Offer Management Section
+  package "Offer Management" {
+    usecase "Create Offer" as CreateOffer
+    usecase "Update Offer" as UpdateOffer
+    usecase "Validate Offer" as ValidateOffer
+    usecase "Set Offer Deadline" as OfferDeadline
+    usecase "Attach Documentation" as OfferDocs
+    usecase "Define Offer Conditions" as OfferConditions
+  }
+  
+  ' Profile Management Section
+  package "Profile Management" {
+    usecase "Manage User Profiles" as ManageProfiles
+    usecase "View Profile" as ViewProfile
+    usecase "Calculate Performance Score" as CalculateEntrepreneurScore
+    usecase "Attach Certificates" as AttachCertificates
+  }
+  
+  ' Submission Management Section
+  package "Submission Management" {
+    usecase "Create Submission" as CreateSubmission
+    usecase "Validate Submission" as ValidateSubmission
+    usecase "Check Submission Status" as ViewSubmissionStatus
+    usecase "Withdraw Submission" as WithdrawSubmission
+  }
+  
+  ' Offer Exploration Section
+  package "Offer Exploration" {
+    usecase "Search Offers" as SearchOffers
+    usecase "Filter Offers" as FilterOffers
+  }
+  
+  ' Blockchain Operations Section
+  package "Blockchain Operations" {
+    usecase "Push Profile" as BlockchainPushProfile
+    usecase "Push Submission" as BlockchainPushSubmission
+    usecase "Push Offer" as BlockchainPushOffer
+    usecase "Retrieve Entrepreneur History" as BlockchainGetHistory
+  }
+}
+
+
+CorporateUser -|> Admin
+
+' Define Relationships and Interactions
+' Admin Interactions
+Admin --> CreateOffer
+Admin --> UpdateOffer
+Admin --> ManageProfiles
+
+' Corporate User Interaction
+CorporateUser --> CreateOffer
+CorporateUser --> UpdateOffer
+
+' Entrepreneur Interactions
+Entrepreneur --> ViewProfile
+Entrepreneur --> CreateSubmission
+Entrepreneur --> SearchOffers
+Entrepreneur --> FilterOffers
+Entrepreneur --> ViewSubmissionStatus
+
+' Expert Interactions
+ValidateOffer <-- Expert
+ValidateSubmission <-- Expert
+CalculateEntrepreneurScore <-- Expert
+
+
+' Blockchain Interactions
+BlockchainPushProfile <-- Blockchain
+BlockchainPushSubmission <-- Blockchain
+BlockchainPushOffer <-- Blockchain
+BlockchainGetHistory <-- Blockchain
+BlockchainGetHistory ..> CalculateEntrepreneurScore
+
+' Use Case Relationships
+' Offer Relationships
+CreateOffer ..> OfferDocs : <<include>>
+CreateOffer ..> OfferDeadline : <<include>>
+CreateOffer ..> OfferConditions : <<include>>
+CreateOffer ..> ValidateOffer : <<include>>
+UpdateOffer ..> ValidateOffer : <<include>>
+ValidateOffer ..> BlockchainPushOffer : <<include>>
+
+' Profile Relationships
+CalculateEntrepreneurScore ..> ValidateSubmission : <<include>>
+ManageProfiles <.. AttachCertificates : <<extend>>
+ManageProfiles ..> BlockchainPushProfile : <<include>>
+
+' Submission Relationships
+CreateSubmission ..> ValidateSubmission : <<include>>
+WithdrawSubmission ..> CreateSubmission : <<extend>>
+ValidateSubmission ..> BlockchainPushSubmission : <<include>>
+
+@enduml
+
