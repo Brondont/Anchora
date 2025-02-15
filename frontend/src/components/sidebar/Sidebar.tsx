@@ -24,7 +24,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import { useNavigate } from "react-router-dom";
-import { UserProps } from "../../../pages/user/ProfilePage";
+import { UserProps } from "../../types";
 
 const DRAWER_WIDTH = 260;
 const COLLAPSED_DRAWER_WIDTH = 64;
@@ -97,7 +97,7 @@ interface SidebarProps {
   onSelect: (section: string) => void;
   sections: Section[];
   selectedSection: string;
-  user: UserProps;
+  user: UserProps | undefined;
   handleLogout: () => void;
 }
 
@@ -244,7 +244,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   justifyContent: "center",
                 }}
               >
-                <HomeIcon />
+                <HomeIcon color="primary" />
               </ListItemIcon>
               <ListItemText
                 primary="Home"

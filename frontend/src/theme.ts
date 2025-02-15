@@ -53,6 +53,17 @@ const baseTheme: ThemeOptions = {
         },
       },
     },
+    MuiCard: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          borderRadius: "12px", // Rounded corners
+          border: `1px solid ${theme.palette.divider}`, // Light border for subtle effect
+          backgroundColor: theme.palette.background.paper, // Ensure it's white
+          boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.05)", // Binance has a very soft shadow
+          padding: "24px", // Adds some internal spacing
+        }),
+      },
+    },
   },
 };
 
@@ -61,8 +72,8 @@ const lightThemeOptions: ThemeOptions = {
   palette: {
     mode: "light",
     primary: {
-      main: "#FFCC00", // Bright gold accent
-      contrastText: "#000000", // Black text on gold for high contrast
+      main: "#1976D2", // Trustworthy blue (Blue 700)
+      contrastText: "#FFFFFF", // White text for high contrast
     },
     secondary: {
       main: "#D1C4E9", // Soft Lavender for secondary elements
@@ -81,7 +92,7 @@ const lightThemeOptions: ThemeOptions = {
       contrastText: "#000000",
     },
     info: {
-      main: "#0288D1", // Light Blue
+      main: "#0288D1", // Light Blue (for informational elements)
       contrastText: "#FFFFFF",
     },
     success: {
@@ -97,10 +108,10 @@ const lightThemeOptions: ThemeOptions = {
     damp: "#F9F9F9", // Very light gray for subtle section backgrounds
   },
   borderColor: {
-    primary: "#FFCC00", // Matching the bright gold accent for borders
+    primary: "#1976D2", // Matching the blue for borders
   },
   customColors: {
-    goldDark: "#DF9800", // Darker gold for optional text or accents
+    goldDark: "#DF9800", // You can keep this for accents if needed
   },
 };
 
@@ -109,8 +120,8 @@ const darkThemeOptions: ThemeOptions = {
   palette: {
     mode: "dark",
     primary: {
-      main: "#FFCC00", // Use the same bright gold in dark mode
-      contrastText: "#000000", // Black text on gold for readability
+      main: "#1976D2", // Same trustworthy blue in dark mode
+      contrastText: "#FFFFFF", // White text for readability
     },
     secondary: {
       main: "#9575CD", // Lilac for secondary elements
@@ -145,10 +156,10 @@ const darkThemeOptions: ThemeOptions = {
     damp: "#2C2C2C",
   },
   borderColor: {
-    primary: "#FFCC00",
+    primary: "#1976D2",
   },
   customColors: {
-    goldDark: "#D4AF37", // Same darker gold for dark mode
+    goldDark: "#D4AF37",
   },
 };
 

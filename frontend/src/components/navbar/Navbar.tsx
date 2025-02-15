@@ -18,6 +18,10 @@ import {
   Badge,
   useMediaQuery,
   ListItemButton,
+  Menu,
+  Avatar,
+  MenuItem,
+  Tooltip,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import LoginIcon from "@mui/icons-material/Login";
@@ -25,13 +29,16 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import CallIcon from "@mui/icons-material/Call";
 import PersonIcon from "@mui/icons-material/Person";
 import EmailIcon from "@mui/icons-material/Email";
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import SettingsIcon from "@mui/icons-material/Settings";
+import PublicIcon from "@mui/icons-material/Public";
 import { useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
-import { UserProps } from "../../pages/user/ProfilePage";
-import { useLocation, useNavigate } from "react-router-dom";
+import { UserProps } from "../../types";
+import { useNavigate } from "react-router-dom";
+import { Logout } from "@mui/icons-material";
 
 // Keep your existing MaterialUISwitch styled component...
 const MaterialUISwitch = styled(Switch)(({ theme }) => ({
@@ -108,7 +115,7 @@ type NavbarProps = {
 
 const Navbar: React.FC<NavbarProps> = ({
   user,
-  isAuth = () => {},
+  isAuth = false,
   handleLogout = () => {},
   toggleDarkMode = () => {},
   isDarkMode = false,
@@ -119,41 +126,24 @@ const Navbar: React.FC<NavbarProps> = ({
   const [lastScrollY, setLastScrollY] = useState<number>(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchDrawerOpen, setSearchDrawerOpen] = useState(false);
-  const [cartItemCount, setCartItemCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const userSettingsOpen = Boolean(anchorEl);
   const navbarRef = useRef<HTMLDivElement | null>(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const navigate = useNavigate();
-  const location = useLocation();
-  const apiUrl = "";
-  const token = localStorage.getItem("token");
 
-  // Fetch cart item count
-  useEffect(() => {
-    if (!token || !apiUrl) return;
-    const fetchCartItemCount = async () => {
-      try {
-        const res = await fetch(`${apiUrl}/cart`, {
-          headers: {
-            Authorization: "Bearer " + token,
-          },
-        });
+  const handleClickUserSettings = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    setAnchorEl(event.currentTarget);
+  };
+  const handleCloseUserSettings = () => {
+    setAnchorEl(null);
+  };
 
-        const resData = await res.json();
-
-        if (resData.error) {
-          throw resData.error;
-        }
-
-        setCartItemCount(resData.cartItems.length);
-      } catch (error) {
-        console.error("Error fetching cart item count:", error);
-      }
-    };
-
-    fetchCartItemCount();
-  }, [apiUrl, token, location]);
+  useEffect(() => {}, [isAuth]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -358,9 +348,119 @@ const Navbar: React.FC<NavbarProps> = ({
       </Box>
 
       <Box sx={{ display: "flex", alignItems: "center" }}>
-        <Button variant="contained" href="/login" size="small">
-          Log in
-        </Button>
+        {isAuth ? (
+          <>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                textAlign: "center",
+              }}
+            >
+              <Tooltip title="Account settings">
+                <IconButton
+                  onClick={handleClickUserSettings}
+                  size="small"
+                  sx={{ ml: 2 }}
+                  aria-controls={userSettingsOpen ? "account-menu" : undefined}
+                  aria-haspopup="true"
+                  aria-expanded={userSettingsOpen ? "true" : undefined}
+                >
+                  <Avatar color="primary" sx={{ width: 32, height: 32 }} />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Menu
+              anchorEl={anchorEl}
+              id="account-menu"
+              open={userSettingsOpen}
+              onClose={handleCloseUserSettings}
+              onClick={handleCloseUserSettings}
+              slotProps={{
+                paper: {
+                  elevation: 0,
+                  sx: {
+                    overflow: "visible",
+                    filter: "drop-shadow(0px 2px 8px rgba(0,0,0,0.32))",
+                    mt: 1.5,
+                    "& .MuiAvatar-root": {
+                      width: 32,
+                      height: 32,
+                      ml: -0.5,
+                      mr: 1,
+                    },
+                    "&::before": {
+                      content: '""',
+                      display: "block",
+                      position: "absolute",
+                      top: 0,
+                      right: 14,
+                      width: 10,
+                      height: 10,
+                      bgcolor: "background.paper",
+                      transform: "translateY(-50%) rotate(45deg)",
+                      zIndex: 0,
+                    },
+                  },
+                },
+              }}
+              transformOrigin={{ horizontal: "right", vertical: "top" }}
+              anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+            >
+              <MenuItem
+                onClick={() => {
+                  navigate(`/profile/${user.ID}`);
+                  handleCloseUserSettings();
+                }}
+              >
+                <ListItemIcon>
+                  <PublicIcon color="primary" />
+                </ListItemIcon>
+                Profile
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  navigate(`/account/settings`);
+                  handleCloseUserSettings();
+                }}
+              >
+                <ListItemIcon>
+                  <SettingsIcon color="primary" />
+                </ListItemIcon>
+                My Account
+              </MenuItem>
+              {
+                <MenuItem
+                  onClick={() => {
+                    navigate(`/admin`);
+                    handleCloseUserSettings();
+                  }}
+                >
+                  <ListItemIcon>
+                    <AdminPanelSettingsIcon color="error" />
+                  </ListItemIcon>
+                  Admin Space
+                </MenuItem>
+              }
+              <Divider />
+              <MenuItem
+                onClick={() => {
+                  handleCloseUserSettings();
+                  handleLogout();
+                }}
+              >
+                <ListItemIcon>
+                  <Logout color="error" fontSize="small" />
+                </ListItemIcon>
+                Logout
+              </MenuItem>
+            </Menu>
+          </>
+        ) : (
+          <Button variant="contained" href="/login" size="small">
+            Log in
+          </Button>
+        )}
         <MaterialUISwitch
           sx={{ m: 1 }}
           checked={isDarkMode}

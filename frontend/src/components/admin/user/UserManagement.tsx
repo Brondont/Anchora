@@ -11,24 +11,25 @@ import {
   TablePagination,
   IconButton,
   TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Chip,
   CardContent,
   Card,
+  CardHeader,
+  Divider,
+  InputAdornment,
 } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Add as AddIcon,
-  Save as SaveIcon,
-  Close as CloseIcon,
+  Search as SearchIcon,
 } from "@mui/icons-material";
 import { useFeedback } from "../../../FeedbackAlertContext";
-import { UserProps } from "../../../pages/user/ProfilePage";
+import { Role, UserProps } from "../../../types";
 import ConfirmationDialog from "../../confirmationDialog/ConfirmationDialog";
+import RolesDialog from "./RolesDialog";
+import { useNavigate } from "react-router-dom";
 
 interface UserDialogData {
   username: string;
@@ -46,16 +47,6 @@ const UserManagement: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
-  const [selectedUser, setSelectedUser] = useState<UserProps | null>(null);
-  const [dialogData, setDialogData] = useState<UserDialogData>({
-    username: "",
-    email: "",
-    phoneNumber: "",
-    isAdmin: false,
-    password: "",
-  });
 
   // Combined confirmation dialog state
   const [confirmationDialogData, setConfirmationDialogData] = useState<{
@@ -69,10 +60,14 @@ const UserManagement: React.FC = () => {
     message: "",
     onConfirm: () => {},
   });
+  const [openRolesDialog, setOpenRolesDialog] = useState(false);
 
   const { showFeedback } = useFeedback();
-  const apiUrl = process.env.REACT_APP_API_URL;
+  const apiUrl = import.meta.env.VITE_API_URL;
   const token = localStorage.getItem("token");
+  const navigate = useNavigate();
+
+  const handleRolesChange = (updatedRoles: Role[]) => {};
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -95,8 +90,8 @@ const UserManagement: React.FC = () => {
       }
 
       setUsers(resData.users);
-      setTotalUsers(resData.total);
-    } catch (err) {
+      setTotalUsers(resData.pagination.totalItems);
+    } catch (err: any) {
       if (err) showFeedback(err.msg, false);
       else showFeedback("Failed to load users", false);
     } finally {
@@ -124,91 +119,6 @@ const UserManagement: React.FC = () => {
     setPage(0);
   };
 
-  const handleOpenDialog = (mode: "create" | "edit", user?: UserProps) => {
-    setDialogMode(mode);
-    if (mode === "edit" && user) {
-      setSelectedUser(user);
-      setDialogData({
-        username: user.username,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        isAdmin: user.isAdmin,
-      });
-    } else {
-      setSelectedUser(null);
-      setDialogData({
-        username: "",
-        email: "",
-        phoneNumber: "",
-        isAdmin: false,
-        password: "",
-      });
-    }
-    setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setDialogData({
-      username: "",
-      email: "",
-      phoneNumber: "",
-      isAdmin: false,
-      password: "",
-    });
-  };
-
-  const handleSubmit = async () => {
-    if (isProcessing) return;
-    setIsProcessing(true);
-
-    try {
-      const method = dialogMode === "create" ? "POST" : "PUT";
-      const url = apiUrl + (dialogMode === "create" ? "/signup" : "/user");
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(dialogData),
-      });
-
-      const resData = await res.json();
-
-      if (resData.error) {
-        throw resData.error;
-      }
-
-      showFeedback(
-        `User ${dialogMode === "create" ? "created" : "updated"} successfully`,
-        true
-      );
-      if (dialogMode === "create") {
-        setUsers((prev) => [...prev, resData.user]);
-      } else {
-        setUsers((prev) =>
-          prev.map((user) => {
-            if (user.email === dialogData.email) {
-              return resData.user;
-            }
-            return user;
-          })
-        );
-      }
-
-      handleCloseDialog();
-    } catch (err) {
-      if (err.length > 0) {
-        showFeedback(err[0].msg, false);
-      } else if (err.msg) showFeedback(err.msg, false);
-      else showFeedback(`Failed to ${dialogMode} user`, false);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const handleDelete = async (userID: number) => {
     setIsProcessing(true);
     try {
@@ -227,7 +137,7 @@ const UserManagement: React.FC = () => {
 
       setUsers((prevUsers) => prevUsers.filter((user) => user.ID !== userID));
       showFeedback("User deleted successfully", true);
-    } catch (err) {
+    } catch (err: any) {
       if (err.msg) showFeedback(err.msg, false);
       else showFeedback("Failed to delete user", false);
     } finally {
@@ -246,90 +156,139 @@ const UserManagement: React.FC = () => {
   };
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        justifyContent: "center",
-        width: "100%",
-      }}
-    >
-      <Card
-        sx={{
-          flex: "1 1 80%",
-          maxWidth: "80%",
-          width: "100%",
-        }}
-      >
-        <CardContent
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-            p: 4,
-          }}
-        >
-          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
-            <Typography variant="h4">User Management</Typography>
-            <LoadingButton
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog("create")}
-              loading={isProcessing}
-            >
-              Add User
-            </LoadingButton>
+    <Box sx={{ maxWidth: 1200, mx: "auto", width: "100%" }}>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4">User Management</Typography>
+      </Box>
+
+      <Card>
+        <CardContent sx={{ p: 3 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 3,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <Typography variant="h6" fontWeight="bold" sx={{ mr: 1 }}>
+                All Users
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {totalUsers}
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: "flex", gap: 2 }}>
+              <TextField
+                size="small"
+                variant="outlined"
+                placeholder="Search users..."
+                value={searchQuery}
+                onChange={handleSearch}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+              <LoadingButton
+                variant="contained"
+                startIcon={<AddIcon />}
+                loading={isProcessing}
+              >
+                Add User
+              </LoadingButton>
+              <LoadingButton
+                variant="outlined"
+                onClick={() => {
+                  setOpenRolesDialog(true);
+                }}
+                loading={isProcessing}
+              >
+                Manage Roles
+              </LoadingButton>
+            </Box>
           </Box>
 
-          <TextField
-            fullWidth
-            variant="outlined"
-            placeholder="Search by Username, Email or Phone Number"
-            value={searchQuery}
-            onChange={handleSearch}
-            sx={{ mb: 3 }}
-          />
-
           <TableContainer sx={{ maxHeight: "calc(100vh - 300px)" }}>
-            <Table stickyHeader>
+            <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>ID</TableCell>
                   <TableCell>Username</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Phone Number</TableCell>
-                  <TableCell>Admin</TableCell>
+                  <TableCell>Roles</TableCell>
                   <TableCell>Created At</TableCell>
-                  <TableCell>Actions</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {users.map((user) => (
-                  <TableRow key={user.ID}>
+                  <TableRow key={user.ID} hover>
                     <TableCell>{user.ID}</TableCell>
                     <TableCell>{user.username}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{user.phoneNumber}</TableCell>
-                    <TableCell>{user.isAdmin ? "Yes" : "No"}</TableCell>
+                    <TableCell>
+                      <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                        {user.Roles?.map((role) => (
+                          <Chip
+                            key={role.name}
+                            label={role.name}
+                            color="primary"
+                            size="small"
+                            variant="outlined"
+                          />
+                        ))}
+                      </Box>
+                    </TableCell>
                     <TableCell>
                       {new Date(user.CreatedAt).toLocaleDateString()}
                     </TableCell>
-                    <TableCell>
+                    <TableCell align="right">
                       <IconButton
-                        onClick={() => handleOpenDialog("edit", user)}
+                        size="small"
+                        onClick={() => navigate(`admin/user/${user.ID}`)}
                         disabled={isProcessing}
                       >
-                        <EditIcon />
+                        <EditIcon fontSize="small" />
                       </IconButton>
                       <IconButton
+                        size="small"
                         onClick={() => handleDeleteClick(user.ID)}
                         disabled={isProcessing}
                         color="error"
                       >
-                        <DeleteIcon />
+                        <DeleteIcon fontSize="small" />
                       </IconButton>
                     </TableCell>
                   </TableRow>
                 ))}
+                {isLoadingUsers && (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Typography variant="body2" color="text.secondary">
+                        Loading users...
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!isLoadingUsers && users.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Typography variant="body2" color="text.secondary">
+                        No users found
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </TableContainer>
@@ -343,90 +302,24 @@ const UserManagement: React.FC = () => {
             onRowsPerPageChange={handleChangeRowsPerPage}
             rowsPerPageOptions={[5, 10, 25, 50]}
           />
-
-          <Dialog
-            open={openDialog}
-            onClose={handleCloseDialog}
-            maxWidth="sm"
-            fullWidth
-          >
-            <DialogTitle>
-              {dialogMode === "create" ? "Create New User" : "Edit User"}
-              <IconButton
-                onClick={handleCloseDialog}
-                sx={{ position: "absolute", right: 8, top: 8 }}
-              >
-                <CloseIcon />
-              </IconButton>
-            </DialogTitle>
-            <DialogContent>
-              <Box
-                sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}
-              >
-                <TextField
-                  label="Username"
-                  fullWidth
-                  value={dialogData.username}
-                  onChange={(e) =>
-                    setDialogData({ ...dialogData, username: e.target.value })
-                  }
-                />
-                <TextField
-                  label="Email"
-                  type="email"
-                  fullWidth
-                  value={dialogData.email}
-                  onChange={(e) =>
-                    setDialogData({ ...dialogData, email: e.target.value })
-                  }
-                />
-                <TextField
-                  label="Phone Number"
-                  fullWidth
-                  value={dialogData.phoneNumber}
-                  onChange={(e) =>
-                    setDialogData({
-                      ...dialogData,
-                      phoneNumber: e.target.value,
-                    })
-                  }
-                />
-                {dialogMode === "create" && (
-                  <TextField
-                    label="Password"
-                    type="password"
-                    fullWidth
-                    value={dialogData.password}
-                    onChange={(e) =>
-                      setDialogData({ ...dialogData, password: e.target.value })
-                    }
-                  />
-                )}
-              </Box>
-            </DialogContent>
-            <DialogActions>
-              <LoadingButton
-                onClick={handleSubmit}
-                loading={isProcessing}
-                variant="contained"
-                startIcon={<SaveIcon />}
-              >
-                {dialogMode === "create" ? "Create" : "Update"}
-              </LoadingButton>
-            </DialogActions>
-          </Dialog>
-
-          <ConfirmationDialog
-            open={confirmationDialogData.open}
-            onClose={() =>
-              setConfirmationDialogData((prev) => ({ ...prev, open: false }))
-            }
-            onConfirm={confirmationDialogData.onConfirm}
-            title={confirmationDialogData.title}
-            message={confirmationDialogData.message}
-          />
         </CardContent>
       </Card>
+
+      <ConfirmationDialog
+        open={confirmationDialogData.open}
+        onClose={() =>
+          setConfirmationDialogData((prev) => ({ ...prev, open: false }))
+        }
+        onConfirm={confirmationDialogData.onConfirm}
+        title={confirmationDialogData.title}
+        message={confirmationDialogData.message}
+      />
+
+      <RolesDialog
+        open={openRolesDialog}
+        onClose={() => setOpenRolesDialog(false)}
+        onRolesChange={handleRolesChange}
+      />
     </Box>
   );
 };

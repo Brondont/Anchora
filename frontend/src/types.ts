@@ -1,3 +1,7 @@
+export interface Role {
+  name: string;
+}
+
 export interface UserProps {
   ID: number;
   CreatedAt: string;
@@ -6,5 +10,9 @@ export interface UserProps {
   username: string;
   email: string;
   phoneNumber: string;
-  isAdmin: boolean;
+  Roles: Role[] | null;
+}
+
+export interface ErrorResponse {
+  msg: string;
 }

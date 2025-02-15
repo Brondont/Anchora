@@ -1,38 +1,67 @@
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Avatar,
   Typography,
   Button,
-  Card,
   useTheme,
   useMediaQuery,
   Divider,
+  CircularProgress,
+  Card,
+  CardContent,
 } from "@mui/material";
-import { Email, Edit, CalendarToday, LocationOn } from "@mui/icons-material";
-import LocalPhoneIcon from "@mui/icons-material/LocalPhone";
-import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import {
+  Email,
+  Edit,
+  CalendarToday,
+  LocationOn,
+  LocalPhone,
+} from "@mui/icons-material";
 import MyBreadcrumbs from "../../components/myBreadcrumbs/MyBreadcrumbs";
+import { useFeedback } from "../../FeedbackAlertContext";
+import { useParams } from "react-router-dom";
+import { UserProps } from "../../types";
 
-export interface UserProps {
-  ID: number;
-  CreatedAt: string;
-  UpdatedAt: string;
-  DeletedAt: string | null;
-  username: string;
-  email: string;
-  phoneNumber: string;
-  isAdmin: boolean;
+interface UserPageProps {
+  activeUser: UserProps | null;
 }
 
-interface UserProfileProps {
-  user: UserProps;
-}
+const ProfilePage: React.FC<UserPageProps> = ({ activeUser }) => {
+  const [user, setUser] = useState<UserProps | null>(null);
+  const [loadingUserData, setLoadingUserData] = useState(true);
+  const { showFeedback } = useFeedback();
+  const { userID } = useParams();
 
-const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
-  console.log(user);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  const fetchUser = useCallback(async () => {
+    if (!userID) {
+      showFeedback("Invalid user ID", false);
+      setLoadingUserData(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${apiUrl}/user/${userID}`);
+      const resData = await res.json();
+
+      if (!res.ok) throw new Error(resData.error || "Failed to fetch user");
+
+      setUser(resData.user);
+    } catch (err: any) {
+      showFeedback(err.message || "Failed to load user details", false);
+      setUser(null);
+    } finally {
+      setLoadingUserData(false);
+    }
+  }, [apiUrl, userID, showFeedback]);
+
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString("en-US", {
@@ -42,176 +71,140 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     });
   };
 
-  return (
-    <Box sx={{ minHeight: "70vh", py: 3 }}>
-      <MyBreadcrumbs />
+  if (loadingUserData) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
+  if (!user) {
+    return (
+      <Box sx={{ textAlign: "center", mt: 4 }}>
+        <Typography variant="h6" color="error">
+          User not found
+        </Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ minHeight: "70vh", p: theme.spacing(3) }}>
       <Box
         sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: isMobile ? "column" : "row",
-          gap: 3,
+          maxWidth: 1280,
+          mx: "auto",
           mt: 4,
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          gap: 4,
+          alignItems: "flex-start",
         }}
       >
+        {/* Profile Section */}
         <Card
           sx={{
+            flex: 1,
+            width: "100%",
             p: 4,
-            display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            gap: 4,
-            position: "relative",
-            minHeight: "300px",
           }}
         >
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              minWidth: isMobile ? "auto" : "200px",
-            }}
-          >
-            <Avatar
+          <CardContent>
+            <Box
               sx={{
-                width: 120,
-                height: 120,
-                bgcolor: "primary.main",
-                fontSize: "3rem",
-                mb: 2,
-                boxShadow: 2,
+                display: "flex",
+                flexDirection: isMobile ? "column" : "row",
+                gap: 4,
+                alignItems: "center",
               }}
             >
-              {user.username.charAt(0).toUpperCase()}
-            </Avatar>
-            <Typography
-              variant="h5"
-              sx={{ fontWeight: 600, textAlign: "center" }}
-            >
-              {user.username}
-            </Typography>
-            {user.isAdmin && (
               <Box
                 sx={{
-                  mt: 1,
-                  px: 2,
-                  py: 0.5,
-                  bgcolor: theme.palette.error.main,
-                  borderRadius: 1,
-                  color: "white",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
                 }}
               >
-                Admin
-              </Box>
-            )}
-          </Box>
-
-          {!isMobile && <Divider orientation="vertical" flexItem />}
-          {isMobile && <Divider sx={{ my: 2 }} />}
-
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-              Profile Information
-            </Typography>
-
-            <Box sx={{ mb: 3 }}>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-                gutterBottom
-              >
-                E-mail
-              </Typography>
-              <Box sx={{ display: "flex", alignItems: "center" }}>
-                <Email sx={{ fontSize: 20, mr: 1, color: "primary.main" }} />
-                <Typography>{user.email}</Typography>
-              </Box>
-            </Box>
-
-            {user.phoneNumber && (
-              <Box sx={{ mb: 3 }}>
-                <Typography
-                  variant="subtitle2"
-                  color="text.secondary"
-                  gutterBottom
+                <Avatar
+                  sx={{
+                    width: 120,
+                    height: 120,
+                    bgcolor: "primary.main",
+                    fontSize: "3rem",
+                    mb: 2,
+                  }}
                 >
-                  Phone Number
+                  {user.username.charAt(0).toUpperCase()}
+                </Avatar>
+                <Typography variant="h5" fontWeight="bold">
+                  {user.username}
                 </Typography>
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  <LocalPhoneIcon
-                    sx={{ fontSize: 20, mr: 1, color: "primary.main" }}
-                  />
-                  <Typography>{user.phoneNumber}</Typography>
-                </Box>
+                {user.Roles?.some((role) => role.name === "admin") && (
+                  <Box
+                    sx={{
+                      mt: 1,
+                      px: 2,
+                      py: 0.5,
+                      bgcolor: "error.main",
+                      borderRadius: 1,
+                      color: "white",
+                      fontSize: theme.typography.caption,
+                    }}
+                  >
+                    Admin
+                  </Box>
+                )}
               </Box>
-            )}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-                gutterBottom
-              >
-                Member Since
-              </Typography>
-              <Box sx={{ display: "flex", alignItems: "center" }}>
-                <CalendarToday
-                  sx={{ fontSize: 20, mr: 1, color: "primary.main" }}
-                />
-                <Typography>{formatDate(user.CreatedAt)}</Typography>
+
+              {!isMobile && <Divider orientation="vertical" flexItem />}
+              {isMobile && <Divider sx={{ width: "100%", my: 2 }} />}
+
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="h6" fontWeight="bold" mb={3}>
+                  Profile Information
+                </Typography>
+
+                <Box mb={2}>
+                  <Typography variant="body2" color="text.secondary" mb={1}>
+                    Email
+                  </Typography>
+                  <Box display="flex" alignItems="center">
+                    <Email
+                      sx={{ fontSize: 20, mr: 1, color: "primary.main" }}
+                    />
+                    <Typography variant="body1">{user.email}</Typography>
+                  </Box>
+                </Box>
+
+                <Box mb={2}>
+                  <Typography variant="body2" color="text.secondary" mb={1}>
+                    Member Since
+                  </Typography>
+                  <Box display="flex" alignItems="center">
+                    <CalendarToday
+                      sx={{ fontSize: 20, mr: 1, color: "primary.main" }}
+                    />
+                    <Typography variant="body1">
+                      {formatDate(user.CreatedAt)}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                {activeUser && activeUser.ID === user.ID && (
+                  <Box>
+                    <Button href="/account" variant="contained">
+                      Edit your account.
+                    </Button>
+                  </Box>
+                )}
               </Box>
             </Box>
-          </Box>
-        </Card>
-
-        <Card
-          sx={{
-            p: 4,
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            minWidth: isMobile ? "auto" : "300px",
-          }}
-        >
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            Quick Actions
-          </Typography>
-
-          <Button
-            href="/account/addresses"
-            variant="contained"
-            startIcon={<LocationOn />}
-            fullWidth
-            sx={{ textTransform: "none" }}
-          >
-            Manage Addresses
-          </Button>
-
-          <Button
-            variant="outlined"
-            startIcon={<Edit />}
-            fullWidth
-            sx={{ textTransform: "none" }}
-          >
-            Edit Profile
-          </Button>
-
-          {user.isAdmin && (
-            <Button
-              href="/admin/dashboard"
-              variant="outlined"
-              color="error"
-              startIcon={<AdminPanelSettingsIcon />}
-              sx={{ textTransform: "none" }}
-            >
-              Admin Space
-            </Button>
-          )}
+          </CardContent>
         </Card>
       </Box>
     </Box>
   );
 };
 
-export default UserProfile;
+export default ProfilePage;

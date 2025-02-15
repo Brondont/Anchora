@@ -18,6 +18,7 @@ services:
       - trust
     environment:
       - SKIP_PREFLIGHT_CHECK="true"
+      - VITE_API_URL=http://localhost:3080/api/v1
   trust-api:
     build:
       context: ./server

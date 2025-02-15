@@ -1,72 +1,96 @@
 @startuml
 
-left to right direction
-
+' Define Actors
 actor "System Administrator" as Admin
 actor "Entrepreneur" as Entrepreneur
 actor "Expert" as Expert
+actor "Automated Auditor" as Auditor
+
+' External system for immutable record-keeping
 rectangle "Blockchain" as Blockchain <<external system>>
 
+' Group Contract Management Use Cases
+  usecase "Create Contract" as CreateContract
+  usecase "Update Contract" as UpdateContract
+  usecase "Set Contract Deadline" as OfferDeadline
+  usecase "Attach Documentation" as OfferDocs
+  usecase "Define Contract Conditions" as OfferConditions
+  usecase "Browse Contracts" as BrowseContracts
 
-    usecase "Create Contract" as CreateContract
-    usecase "Browse Contracts" as BrowseContracts
-    usecase "Update Contract" as UpdateContract
-    usecase "Set Contract Deadline" as OfferDeadline
-    usecase "Attach Documentation" as OfferDocs
-    usecase "Define Contract Conditions" as OfferConditions
+' Group User Management Use Cases
+  usecase "Manage Users" as CRUDUser
+  usecase "Attach Certificates" as UserCertificates
 
-    usecase "Manage Users" as CRUDUser
-    usecase "Attach Certificates" as UserCertificates
+' Group Bid Management Use Cases
+  usecase "Submit Bid" as SubmitBid
+  usecase "Withdraw Bid" as WithdrawBid
+  usecase "View Bid Rank" as ViewRank
 
-    usecase "Submit Bid" as SubmitBid
-    usecase "Withdraw Bid" as WithdrawBid
-    usecase "View Bid Rank" as ViewRank
+' Group Evaluation Use Cases
+  usecase "Evaluate Bid" as EvaluateBid
+  usecase "Evaluate Contract" as EvaluateContract
+  usecase "Classify Bid" as ClassifyBid
+  usecase "Audit Evaluations" as AuditEval
 
-    usecase "Validate Bid" as ValidateBid
-    usecase "Validate Contract" as ValidateContract
-    usecase "Classify Bids" as ClassifyBids
+' Group Blockchain Operations
+  usecase "Push Contract" as PushContract
+  usecase "Push Profile" as PushProfile
+  usecase "Push Submission" as PushBid
 
-    usecase "Push Contract" as PushContract
-    usecase "Push Profile" as PushProfile
-    usecase "Push Submission" as PushBid
-
-' Admin connections
+'-------------------------
+' Actor-to-Use Case Connections
+'-------------------------
+' System Administrator interactions
 Admin --> CreateContract
 Admin --> UpdateContract
 Admin --> CRUDUser
 
-' Entrepreneur connections
+' Entrepreneur interactions
 Entrepreneur --> SubmitBid
 Entrepreneur --> WithdrawBid
 Entrepreneur --> BrowseContracts
 Entrepreneur --> ViewRank
 
-' Expert connections
-Expert --> ValidateBid
-Expert -right-> ValidateContract
+' Expert interactions
+Expert --> EvaluateBid
+Expert -right-> EvaluateContract
 
-' Blockchain connection
+' Automated Auditor interaction
+Auditor --> AuditEval
+
+'-------------------------
+' Use Case Relationships
+'-------------------------
+' Contract Management includes validations and details
+CreateContract ..> OfferDeadline : <<include>>
+CreateContract ..> OfferDocs : <<include>>
+CreateContract ..> OfferConditions : <<include>>
+CreateContract ..> EvaluateContract : <<include>>
+
+UpdateContract ..> EvaluateContract : <<include>>
+
+' User Management extension
+CRUDUser <.. UserCertificates : <<extend>>
+
+' Bid Management includes validation
+SubmitBid ..> EvaluateBid : <<include>>
+
+' Evaluation process: Validation triggers classification, which then undergoes auditing
+EvaluateBid ..> ClassifyBid : <<include>>
+ClassifyBid ..> AuditEval : <<include>>
+AuditEval ..> PushBid : <<include>>
+
+' Contract validation triggers blockchain update
+EvaluateContract ..> PushContract : <<include>>
+
+' User management triggers blockchain profile push
+CRUDUser ..> PushProfile : <<include>>
+
+'-------------------------
+' Blockchain Connections
+'-------------------------
 PushContract <-- Blockchain
 PushProfile <-- Blockchain
 PushBid <-- Blockchain
-
-' use case relations
-CreateContract .> ValidateContract : <<include>>
-CreateContract ..> OfferDeadline : <<include>>
-CreateContract ..> OfferDocs : <<include>>
-CreateContract ..> OfferConditions: <<include>>
-
-UpdateContract ..> ValidateContract : <<include>>
-
-CRUDUser <.. UserCertificates : <<extend>>
-
-SubmitBid ..> ValidateBid : <<include>>
-
-
-ValidateContract ..> PushContract : <<include>>
-ValidateBid ..> PushBid : <<include>>
-ValidateBid ..> ClassifyBids : <<include>>
-CRUDUser ..> PushProfile : <<include>>
-
 
 @enduml
