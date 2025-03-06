@@ -26,7 +26,7 @@ import ExpandMore from "@mui/icons-material/ExpandMore";
 import { useNavigate } from "react-router-dom";
 import { UserProps } from "../../types";
 
-const DRAWER_WIDTH = 260;
+const DRAWER_WIDTH = 310;
 const COLLAPSED_DRAWER_WIDTH = 64;
 const TRANSITION_DURATION = 200;
 
@@ -155,6 +155,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const renderListItem = (section: Section, isSubSection = false) => (
     <ListItem
+      key={section.path}
       disablePadding
       sx={{
         display: "block",

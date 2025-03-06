@@ -15,7 +15,6 @@ import React from "react";
 export type LoginFormProps = {
   [key: string]: {
     value: string;
-    valid: boolean;
     error: string;
   };
 };
@@ -43,9 +42,6 @@ const LoginForm: React.FC<LoginFormContentProps> = ({
   inputChangeHandler,
   handleSubmitLogin,
 }) => {
-  const theme = useTheme();
-
-
   return (
     <Card
       sx={{
@@ -74,10 +70,10 @@ const LoginForm: React.FC<LoginFormContentProps> = ({
                 onChange={(event) =>
                   inputChangeHandler(event.target.value, "email")
                 }
-                error={!loginForm.email.valid}
+                error={loginForm.email.error !== ""}
                 helperText={loginForm.email.error || ""}
                 sx={{
-                  ...(isShake && !loginForm.email.valid
+                  ...(isShake && !loginForm.email.error
                     ? { animation: `${shakeAnimation} 0.35s` }
                     : {}),
                 }}
@@ -88,13 +84,13 @@ const LoginForm: React.FC<LoginFormContentProps> = ({
                 type="password"
                 value={loginForm.password.value}
                 label="Password"
-                error={!loginForm.password.valid}
+                error={loginForm.password.error !== ""}
                 helperText={loginForm.password.error || ""}
                 onChange={(event) =>
                   inputChangeHandler(event.target.value, "password")
                 }
                 sx={{
-                  ...(isShake && !loginForm.password.valid
+                  ...(isShake && !loginForm.password.error
                     ? { animation: `${shakeAnimation} 0.35s` }
                     : {}),
                 }}

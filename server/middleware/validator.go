@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 
 	"github.com/Brondont/trust-api/models"
@@ -34,34 +33,21 @@ func ValidateUserInput(payload models.User) []InputValidationError {
 	}
 
 	// Validate username length
-	if len(payload.Username) < 5 {
+	if len(payload.FirstName) < 5 {
 		errors = append(errors, InputValidationError{
 			Type:  "invalid",
-			Value: payload.Username,
+			Value: payload.FirstName,
 			Msg:   "must be at least 5 characters long",
-			Path:  "username",
+			Path:  "firstName",
 		})
 	}
 
-	// Validate password
-	if err := validatePassword(payload.Password); err != nil {
+	if len(payload.LastName) < 5 {
 		errors = append(errors, InputValidationError{
 			Type:  "invalid",
-			Value: "[hidden]",
-			Msg:   err.Error(),
-			Path:  "password",
-		})
-	}
-
-	// Phone number validation
-	re := regexp.MustCompile(`^\+?[1-9]\d{1,14}$`)
-	log.Print(payload.PhoneNumber)
-	if !re.MatchString(payload.PhoneNumber) {
-		errors = append(errors, InputValidationError{
-			Type:  "invalid",
-			Value: payload.PhoneNumber,
-			Msg:   "Invalid phone number submitted.",
-			Path:  "phone",
+			Value: payload.LastName,
+			Msg:   "must be at least 5 characters long",
+			Path:  "lastName",
 		})
 	}
 

@@ -10,21 +10,21 @@ import (
 )
 
 func SetupRoutes(router *mux.Router) {
-	userHandler := handlers.NewUserHandler()
 	adminHandler := handlers.NewAdminHandler()
 	generalHandler := handlers.NewGeneralHandler()
 
 	// General Routes
 	router.HandleFunc("/user/{userID}", generalHandler.GetUser).Methods("GET")
+	router.HandleFunc("/user-profile/{userID}", generalHandler.GetUserProfile).Methods("GET")
 	router.HandleFunc("/login", generalHandler.PostLogin).Methods("POST")
 
 	// User routes
-	router.HandleFunc("/user", auth.RequireRole("user", userHandler.PutUser)).Methods("PUT")
+	router.HandleFunc("/user", auth.RequireRole("user", adminHandler.PutUser)).Methods("PUT")
+	router.HandleFunc("/user", auth.RequireRole("admin", adminHandler.PostUser)).Methods("POST")
 
 	// Admin Routes
 	router.HandleFunc("/users", auth.RequireRole("admin", adminHandler.GetUsers)).Methods("GET")
 	router.HandleFunc("/users/{userID}", auth.RequireRole("admin", adminHandler.DeleteUser)).Methods("DELETE")
-	router.HandleFunc("/signup", auth.RequireRole("admin", adminHandler.PostSignup)).Methods("POST")
 
 	router.HandleFunc("/roles", auth.RequireRole("admin", adminHandler.GetRoles)).Methods("GET")
 	router.HandleFunc("/roles", auth.RequireRole("admin", adminHandler.CreateRole)).Methods("POST")

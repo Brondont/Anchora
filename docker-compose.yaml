@@ -1,3 +1,5 @@
+version: "3.8"
+
 volumes:
   postgres_data:
 
@@ -16,20 +18,14 @@ services:
       - /usr/src/app/node_modules
     networks:
       - trust
-    environment:
-      - SKIP_PREFLIGHT_CHECK="true"
-      - VITE_API_URL=http://localhost:3080/api/v1
+    env_file:
+      - ./frontend/.env
+
   trust-api:
     build:
       context: ./server
     ports:
       - "3080:3080"
-    environment:
-      - DB_HOST=db
-      - DB_USER=kadi
-      - DB_PASSWORD=kadi010203
-      - DB_NAME=ecomdb
-      - JWTSecret=hellotherebuddyhru
     volumes:
       - ./server:/usr/src/app
       - ./server/public:/usr/src/app/public
@@ -37,31 +33,32 @@ services:
       - trust
     depends_on:
       - db
+    env_file:
+      - ./server/.env
+
   db:
     image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=kadi
-      - POSTGRES_PASSWORD=kadi010203
-      - POSTGRES_DB=ecomdb
     ports:
       - "5432:5432"
     networks:
       - trust
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - ./server/.env
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kadi -d ecomdb"]
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
+
   pgadmin:
     image: dpage/pgadmin4
-    environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
-      - PGADMIN_DEFAULT_PASSWORD=admin
     ports:
       - "8080:80"
     networks:
       - trust
     depends_on:
       - db
+    env_file:
+      - ./server/.env

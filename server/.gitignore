@@ -12,6 +12,15 @@
 #public
 /public/*
 
+
+
+# Ignore environment files
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
 # misc
 .env
 .DS_Store

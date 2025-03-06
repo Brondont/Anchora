@@ -1,15 +1,21 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
 	"mime/multipart"
 	"net/http"
+	"net/smtp"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
+
+	"github.com/Brondont/trust-api/config"
 
 	"github.com/Brondont/trust-api/middleware"
 	"golang.org/x/crypto/bcrypt"
@@ -72,6 +78,43 @@ func HashPassword(password string) (string, error) {
 func VerifyPassword(password string, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
+}
+
+func GenerateRandomPassword(length int) string {
+	// Define the character sets
+	lowercase := "abcdefghijklmnopqrstuvwxyz"
+	uppercase := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	numbers := "0123456789"
+	symbols := "!@#$%^&*()_+-=[]{}|;:,.<>?"
+
+	// Combine all characters into one string
+	allChars := lowercase + uppercase + numbers + symbols
+
+	// Create a new random source with current time as seed
+	randSource := rand.NewSource(time.Now().UnixNano())
+	randGen := rand.New(randSource)
+
+	// Create password builder
+	password := make([]byte, length)
+
+	// Ensure at least one character from each set
+	password[0] = lowercase[randGen.Intn(len(lowercase))]
+	password[1] = uppercase[randGen.Intn(len(uppercase))]
+	password[2] = numbers[randGen.Intn(len(numbers))]
+	password[3] = symbols[randGen.Intn(len(symbols))]
+
+	// Fill the rest with random characters from all sets
+	for i := 4; i < length; i++ {
+		password[i] = allChars[randGen.Intn(len(allChars))]
+	}
+
+	// Shuffle the password to avoid predictable character positions
+	for i := len(password) - 1; i > 0; i-- {
+		j := randGen.Intn(i + 1)
+		password[i], password[j] = password[j], password[i]
+	}
+
+	return string(password)
 }
 
 // ParseMultipartForm parses a multipart form and returns structured data
@@ -164,4 +207,43 @@ func SaveUploadedFile(file *multipart.FileHeader, destDir string) (string, error
 
 	// Return the path to the saved file
 	return destDir + "/" + filename, nil
+}
+
+func SendEmail(to, subject, body string) error {
+	from := config.Envs.EmailSender
+	password := config.Envs.EmailPassword
+	smtpHost := config.Envs.SMTPHost
+	smtpPort := config.Envs.SMTPPort
+
+	// Set up authentication
+	auth := smtp.PlainAuth("", from, password, smtpHost)
+
+	// Construct email headers
+	headers := make(map[string]string)
+	headers["From"] = from
+	headers["To"] = to
+	headers["Subject"] = subject
+	headers["MIME-Version"] = "1.0"
+	headers["Content-Type"] = "text/html; charset=UTF-8"
+
+	// Construct message
+	var message strings.Builder
+	for key, value := range headers {
+		message.WriteString(fmt.Sprintf("%s: %s\r\n", key, value))
+	}
+	message.WriteString("\r\n")
+	message.WriteString(body)
+
+	// Send email
+	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, []string{to}, []byte(message.String()))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func HashSHA256(value string) string {
+	hash := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(hash[:])
 }

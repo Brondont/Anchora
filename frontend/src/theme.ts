@@ -12,7 +12,6 @@ declare module "@mui/material/styles" {
       goldDark: string;
     };
   }
-  // Allow configuration using `createTheme`
   interface ThemeOptions {
     borderColor?: {
       primary?: string;
@@ -38,8 +37,7 @@ const baseTheme: ThemeOptions = {
     MuiButton: {
       styleOverrides: {
         root: ({ theme }) => ({
-          borderRadius: "8px", // Rounded buttons
-          // On hover, brighten the button instead of darkening
+          borderRadius: "8px",
           "&:hover": {
             backgroundColor: lighten(theme.palette.primary.main, 0.2),
           },
@@ -56,12 +54,46 @@ const baseTheme: ThemeOptions = {
     MuiCard: {
       styleOverrides: {
         root: ({ theme }) => ({
-          borderRadius: "12px", // Rounded corners
-          border: `1px solid ${theme.palette.divider}`, // Light border for subtle effect
-          backgroundColor: theme.palette.background.paper, // Ensure it's white
-          boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.05)", // Binance has a very soft shadow
-          padding: "24px", // Adds some internal spacing
+          borderRadius: "12px",
+          border: `1px solid ${theme.palette.divider}`,
+          backgroundColor: theme.palette.background.paper,
+          boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.05)",
+          padding: "24px",
         }),
+      },
+    },
+    // Add stronger shadow to the Menu component
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          borderRadius: "10px",
+          boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.15)", // Increased shadow
+          overflow: "hidden",
+        },
+      },
+    },
+    // Style the menu items
+    MuiMenuItem: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          borderRadius: "6px",
+          margin: "2px 4px",
+          "&:hover": {
+            backgroundColor:
+              theme.palette.mode === "light"
+                ? lighten(theme.palette.primary.light, 0.9)
+                : lighten(theme.palette.primary.dark, 0.1),
+          },
+        }),
+      },
+    },
+    // Add stronger shadow to the Popover component
+    MuiPopover: {
+      styleOverrides: {
+        paper: {
+          borderRadius: "10px",
+          boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.15)", // Increased shadow
+        },
       },
     },
   },
@@ -72,46 +104,46 @@ const lightThemeOptions: ThemeOptions = {
   palette: {
     mode: "light",
     primary: {
-      main: "#1976D2", // Trustworthy blue (Blue 700)
-      contrastText: "#FFFFFF", // White text for high contrast
+      main: "#1976D2",
+      contrastText: "#FFFFFF",
     },
     secondary: {
-      main: "#D1C4E9", // Soft Lavender for secondary elements
+      main: "#D1C4E9",
       contrastText: "#000000",
     },
     background: {
-      default: "#FFFFFF", // Pure white background
-      paper: "#FFFFFF", // Clean white for paper elements
+      default: "#FFFFFF",
+      paper: "#FFFFFF",
     },
     error: {
-      main: "#D32F2F", // Red
+      main: "#D32F2F",
       contrastText: "#FFFFFF",
     },
     warning: {
-      main: "#FFA000", // Amber
+      main: "#FFA000",
       contrastText: "#000000",
     },
     info: {
-      main: "#0288D1", // Light Blue (for informational elements)
+      main: "#0288D1",
       contrastText: "#FFFFFF",
     },
     success: {
-      main: "#388E3C", // Green
+      main: "#388E3C",
       contrastText: "#FFFFFF",
     },
     text: {
-      primary: "#333333", // Dark, easy-to-read text on white
+      primary: "#333333",
       secondary: "#666666",
     },
   },
   background: {
-    damp: "#F9F9F9", // Very light gray for subtle section backgrounds
+    damp: "#F9F9F9",
   },
   borderColor: {
-    primary: "#1976D2", // Matching the blue for borders
+    primary: "#1976D2",
   },
   customColors: {
-    goldDark: "#DF9800", // You can keep this for accents if needed
+    goldDark: "#DF9800",
   },
 };
 
@@ -120,16 +152,16 @@ const darkThemeOptions: ThemeOptions = {
   palette: {
     mode: "dark",
     primary: {
-      main: "#1976D2", // Same trustworthy blue in dark mode
-      contrastText: "#FFFFFF", // White text for readability
+      main: "#1976D2",
+      contrastText: "#FFFFFF",
     },
     secondary: {
-      main: "#9575CD", // Lilac for secondary elements
+      main: "#9575CD",
       contrastText: "#000000",
     },
     background: {
-      default: "#2C2C2C", // Deep dark background
-      paper: "#424242", // Slightly lighter for cards/paper
+      default: "#2C2C2C",
+      paper: "#424242",
     },
     error: {
       main: "#D32F2F",

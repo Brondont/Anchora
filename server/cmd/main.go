@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Brondont/trust-api/cmd/api"
@@ -8,6 +9,7 @@ import (
 )
 
 func main() {
+	fmt.Println("starting backend server")
 	db.ConnectDB()
 
 	server := api.NewAPIServer(":3080", nil)

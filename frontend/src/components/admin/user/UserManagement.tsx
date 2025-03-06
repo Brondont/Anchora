@@ -14,9 +14,11 @@ import {
   Chip,
   CardContent,
   Card,
-  CardHeader,
-  Divider,
   InputAdornment,
+  Menu,
+  MenuItem,
+  ListItemText,
+  ListItemIcon,
 } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
 import {
@@ -25,28 +27,23 @@ import {
   Add as AddIcon,
   Search as SearchIcon,
 } from "@mui/icons-material";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useFeedback } from "../../../FeedbackAlertContext";
 import { Role, UserProps } from "../../../types";
 import ConfirmationDialog from "../../confirmationDialog/ConfirmationDialog";
 import RolesDialog from "./RolesDialog";
 import { useNavigate } from "react-router-dom";
 
-interface UserDialogData {
-  username: string;
-  email: string;
-  phoneNumber: string;
-  isAdmin: boolean;
-  password?: string;
-}
-
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<UserProps[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [selectedUserID, setSelectedUserID] = useState<number>();
   const [totalUsers, setTotalUsers] = useState(0);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const navigate = useNavigate();
 
   // Combined confirmation dialog state
   const [confirmationDialogData, setConfirmationDialogData] = useState<{
@@ -61,11 +58,23 @@ const UserManagement: React.FC = () => {
     onConfirm: () => {},
   });
   const [openRolesDialog, setOpenRolesDialog] = useState(false);
-
   const { showFeedback } = useFeedback();
   const apiUrl = import.meta.env.VITE_API_URL;
   const token = localStorage.getItem("token");
-  const navigate = useNavigate();
+  const [actionsAnchorEl, setActionsAnchorEl] =
+    React.useState<null | HTMLElement>(null);
+  const isActionsOpen = Boolean(actionsAnchorEl);
+
+  const handleActionsClick = (
+    event: React.MouseEvent<HTMLElement>,
+    userID: number
+  ) => {
+    setActionsAnchorEl(event.currentTarget);
+    setSelectedUserID(userID);
+  };
+  const handleActionsClose = () => {
+    setActionsAnchorEl(null);
+  };
 
   const handleRolesChange = (updatedRoles: Role[]) => {};
 
@@ -146,7 +155,8 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const handleDeleteClick = (userId: number) => {
+  const handleDeleteClick = (userId: number | undefined) => {
+    if (!userId) return;
     setConfirmationDialogData({
       open: true,
       title: "Confirm Delete",
@@ -156,13 +166,25 @@ const UserManagement: React.FC = () => {
   };
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", width: "100%" }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4">User Management</Typography>
-      </Box>
-
-      <Card>
-        <CardContent sx={{ p: 3 }}>
+    <Box
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        padding: 3,
+      }}
+    >
+      <Card
+        sx={{
+          width: "100%",
+          overflow: "hidden",
+        }}
+      >
+        <CardContent>
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h5" fontWeight="bold">
+              User Management
+            </Typography>
+          </Box>
           <Box
             sx={{
               display: "flex",
@@ -221,19 +243,21 @@ const UserManagement: React.FC = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>ID</TableCell>
-                  <TableCell>Username</TableCell>
+                  <TableCell>Full Name</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Phone Number</TableCell>
                   <TableCell>Roles</TableCell>
                   <TableCell>Created At</TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                  <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {users.map((user) => (
                   <TableRow key={user.ID} hover>
                     <TableCell>{user.ID}</TableCell>
-                    <TableCell>{user.username}</TableCell>
+                    <TableCell>
+                      {`${user.firstName} ${user.lastName}`}
+                    </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{user.phoneNumber}</TableCell>
                     <TableCell>
@@ -254,19 +278,16 @@ const UserManagement: React.FC = () => {
                     </TableCell>
                     <TableCell align="right">
                       <IconButton
-                        size="small"
-                        onClick={() => navigate(`admin/user/${user.ID}`)}
-                        disabled={isProcessing}
+                        aria-label="more"
+                        id="long-button"
+                        aria-controls={isActionsOpen ? "long-menu" : undefined}
+                        aria-expanded={isActionsOpen ? "true" : undefined}
+                        aria-haspopup="true"
+                        onClick={(event) => {
+                          handleActionsClick(event, user.ID);
+                        }}
                       >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteClick(user.ID)}
-                        disabled={isProcessing}
-                        color="error"
-                      >
-                        <DeleteIcon fontSize="small" />
+                        <MoreVertIcon />
                       </IconButton>
                     </TableCell>
                   </TableRow>
@@ -302,6 +323,47 @@ const UserManagement: React.FC = () => {
             onRowsPerPageChange={handleChangeRowsPerPage}
             rowsPerPageOptions={[5, 10, 25, 50]}
           />
+          <Menu
+            id="long-menu"
+            MenuListProps={{
+              "aria-labelledby": "long-button",
+            }}
+            anchorEl={actionsAnchorEl}
+            open={isActionsOpen}
+            onClose={handleActionsClose}
+            slotProps={{
+              paper: {
+                style: {
+                  maxHeight: 100,
+                  width: "20ch",
+                },
+              },
+            }}
+          >
+            <MenuItem
+              onClick={() => {
+                navigate(`/admin/user-details?userID=${selectedUserID}`);
+              }}
+              key={`edit-${selectedUserID}`}
+            >
+              <ListItemIcon>
+                <EditIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Edit Details</ListItemText>
+            </MenuItem>
+            <MenuItem
+              key={`delete-${selectedUserID}`}
+              onClick={() => {
+                handleDeleteClick(selectedUserID);
+                handleActionsClose();
+              }}
+            >
+              <ListItemIcon>
+                <DeleteIcon color="error" fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Delete User</ListItemText>
+            </MenuItem>
+          </Menu>
         </CardContent>
       </Card>
 

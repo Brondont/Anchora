@@ -1,89 +1,79 @@
-@startuml
+@startuml classDiagram
 
-' Class definitions
-class Admin {
-  - adminID: String
-  - name: String
-  - email: String
-  + createOffer(): void
-  + updateOffer(): void
-  + manageProfile(): void
-}
+left to right direction
 
-class Entrepreneur {
-  - entrepreneurID: String
-  - name: String
-  - email: String
-  + createSubmission(): void
-  + viewProfile(): void
-  + searchOffers(): void
-  + viewSubmissionStatus(): void
-}
+    class Role {
+        +ID uint
+        +Name string
+    }
 
-class Miner {
-  - minerID: String
-  - name: String
-  + validateOffer(): void
-  + validateSubmission(): void
-  + validateProfile(): void
-}
+    class User {
+        +ID uint
+        +FirstName string
+        +LastName string
+        +Email string
+        +Password string
+        +PhoneNumber string
+        +Reputation float64
+    }
 
-class BlockchainService {
-  - blockchainID: String
-  + pushOffer(): void
-  + pushProfile(): void
-  + pushSubmission(): void
-  + pushOfferUpdate(): void
-}
+    class Document {
+        +ID uint
+        +FileName string
+        +URL string
+        +DocumentableID uint
+        +DocumentableType string
+    }
 
-class Offer {
-  - offerID: String
-  - title: String
-  - description: String
-  - deadline: Date
-  - conditions: String
-  - status: String
-  + createOffer(): void
-  + updateOffer(): void
-  + validateOffer(): void
-}
+    class ContractRules {
+        +ID uint
+        +Name string
+        +Description string
+    }
 
-class Profile {
-  - profileID: String
-  - ownerID: String
-  - details: String
-  + createProfile(): void
-  + viewProfile(): void
-  + validateProfile(): void
-}
+    class Contract {
+        +ID uint
+        +Title string
+        +Description string
+        +CreatedBy uint
+        +Budget float64
+        +Currency string
+        +Category string
+        +Location string
+        +BidDeadline time.Time
+        +ContractStart time.Time
+        +ContractEnd time.Time
+        +WinningBidID uint
+        +Status string
+    }
 
-class Submission {
-  - submissionID: String
-  - entrepreneurID: String
-  - offerID: String
-  - status: String
-  + createSubmission(): void
-  + validateSubmission(): void
-  + viewSubmissionStatus(): void
-}
+    class Bid {
+        +ID uint
+        +ContractID uint
+        +BidderID uint
+        +Details string
+        +Status string
+        +SubmittedAt time.Time
+    }
 
-' Relationships
-Admin --|> Entrepreneur: "Manages"
-Admin --|> Offer: "Creates and Updates"
-Admin --|> Profile: "Manages"
-Entrepreneur --|> Offer: "Submits"
-Entrepreneur --|> Submission: "Creates"
-Entrepreneur --|> Profile: "Views"
-Miner --|> Offer: "Validates"
-Miner --|> Submission: "Validates"
-Miner --|> Profile: "Validates"
-BlockchainService --|> Offer: "Pushes"
-BlockchainService --|> Profile: "Pushes"
-BlockchainService --|> Submission: "Pushes"
+    class ExpertEvaluation {
+        +ID uint
+        +BidID uint
+        +Score float64
+        +Comments string
+        +EvaluatedAt time.Time
+        +Weight float64
+    }
 
-Offer --|> Submission: "Associated with"
-Profile --|> Entrepreneur: "Belongs to"
-Profile --|> Admin: "Manages"
+    User "*" --o "*" Role
+    User "1" --o "*" Document
+    Contract "1" --o "*" Document
+    Contract "*" --o "*" ContractRules
+    Contract "1" --o "*" Bid
+    User "1" --o "*" Bid
+    User "1" --o "*" Contract
+    Bid "0..1" --o "1" Contract
+    Bid "1" --o "*" ExpertEvaluation
+    User "1" --o "*" ExpertEvaluation
 
-@enduml
-
+    @enduml

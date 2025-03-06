@@ -11,14 +11,7 @@ import {
   Card,
   CardContent,
 } from "@mui/material";
-import {
-  Email,
-  Edit,
-  CalendarToday,
-  LocationOn,
-  LocalPhone,
-} from "@mui/icons-material";
-import MyBreadcrumbs from "../../components/myBreadcrumbs/MyBreadcrumbs";
+import { Email, CalendarToday } from "@mui/icons-material";
 import { useFeedback } from "../../FeedbackAlertContext";
 import { useParams } from "react-router-dom";
 import { UserProps } from "../../types";
@@ -45,14 +38,14 @@ const ProfilePage: React.FC<UserPageProps> = ({ activeUser }) => {
     }
 
     try {
-      const res = await fetch(`${apiUrl}/user/${userID}`);
+      const res = await fetch(`${apiUrl}/user-profile/${userID}`);
       const resData = await res.json();
 
       if (!res.ok) throw new Error(resData.error || "Failed to fetch user");
 
       setUser(resData.user);
     } catch (err: any) {
-      showFeedback(err.message || "Failed to load user details", false);
+      showFeedback(err.msg || "Failed to load user details", false);
       setUser(null);
     } finally {
       setLoadingUserData(false);
@@ -135,10 +128,10 @@ const ProfilePage: React.FC<UserPageProps> = ({ activeUser }) => {
                     mb: 2,
                   }}
                 >
-                  {user.username.charAt(0).toUpperCase()}
+                  {user.firstName.charAt(0).toUpperCase()}
                 </Avatar>
                 <Typography variant="h5" fontWeight="bold">
-                  {user.username}
+                  {user.firstName}
                 </Typography>
                 {user.Roles?.some((role) => role.name === "admin") && (
                   <Box

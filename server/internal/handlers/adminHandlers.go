@@ -8,11 +8,14 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Brondont/trust-api/config"
 	"github.com/Brondont/trust-api/db"
+	"github.com/Brondont/trust-api/internal/auth"
 	"github.com/Brondont/trust-api/middleware"
 	"github.com/Brondont/trust-api/models"
 	"github.com/Brondont/trust-api/utils"
 	"github.com/gorilla/mux"
+	"gorm.io/gorm"
 )
 
 const (
@@ -46,8 +49,8 @@ func (h *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 
 	offset := (page - 1) * limit
 
-	baseQuery := db.DB.DB.Model(&models.User{}).Select(
-		"id", "email", "username", "created_at", "phone_number", "is_admin",
+	baseQuery := db.DB.DB.Model(&models.User{}).Preload("Roles").Select(
+		"id", "email", "first_name", "last_name", "created_at", "phone_number",
 	)
 
 	if search != "" {
@@ -91,76 +94,240 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	userID := vars["userID"]
 
 	if userID == "" {
-		utils.WriteError(w, http.StatusBadRequest, errors.New("user id is missing in the url"))
+		utils.WriteError(w, http.StatusBadRequest, errors.New("user id is missing in the URL"))
 		return
 	}
 
-	result := db.DB.DB.Where("id = ?", userID).Delete(&models.User{})
-	if result.Error != nil {
-		utils.WriteError(w, http.StatusInternalServerError, result.Error)
+	// Check if the user exists
+	var user models.User
+	if err := db.DB.DB.Preload("Roles").Preload("Certificates").First(&user, userID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.WriteError(w, http.StatusNotFound, errors.New("user not found"))
+		} else {
+			utils.WriteError(w, http.StatusInternalServerError, err)
+		}
 		return
 	}
+
+	// Start a transaction to ensure a clean deletion
+	tx := db.DB.DB.Begin()
+
+	// Remove user-role associations (many-to-many)
+	if err := tx.Model(&user).Association("Roles").Clear(); err != nil {
+		tx.Rollback()
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to remove user-role associations"))
+		return
+	}
+
+	// Remove certificates (polymorphic relation)
+	if err := tx.Where("documentable_id = ? AND documentable_type = ?", user.ID, "User").Delete(&models.Document{}).Error; err != nil {
+		tx.Rollback()
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to delete user certificates"))
+		return
+	}
+
+	// Delete the user
+	if err := tx.Unscoped().Delete(&user).Error; err != nil {
+		tx.Rollback()
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to delete user"))
+		return
+	}
+
+	// Commit the transaction
+	tx.Commit()
 
 	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
-		"message": "User was deleted.",
+		"message": "User was deleted successfully.",
 	})
 }
 
-// TODO: this is for future ability of the admin to create new accounts
-// PostSignup handles user sign up
-func (h *AdminHandler) PostSignup(w http.ResponseWriter, r *http.Request) {
-	// parse the json body
+func (h *AdminHandler) PutUser(w http.ResponseWriter, r *http.Request) {
+	// Extract user ID from the context
+	userID, ok := r.Context().Value("userID").(int)
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, errors.New("user id is missing in the token"))
+		return
+	}
+
+	// Extract isAdmin flag from the context
+	isAdmin, ok := r.Context().Value("isAdmin").(bool)
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, errors.New("admin status is missing in the token"))
+		return
+	}
+
+	// Parse the incoming JSON payload
 	var payload models.User
-	if err := utils.ParseJson(r, &payload); err != nil {
+	err := utils.ParseJson(r, &payload)
+	if err != nil {
 		utils.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
 
+	// Fetch the existing user from the database
+	var existingUser models.User
+	result := db.DB.DB.Where("email = ? OR phone_number = ?", payload.Email, payload.PhoneNumber).First(&existingUser)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			utils.WriteError(w, http.StatusNotFound, errors.New("user not found"))
+			return
+		}
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("something went wrong with fetching the user, try again"))
+		return
+	}
+
+	// If the user is not an admin, ensure they can only edit their own account
+	if !isAdmin && existingUser.ID != uint(userID) {
+		utils.WriteError(w, http.StatusForbidden, errors.New("you do not have permission to edit this user"))
+		return
+	}
+
+	// Update the user's information
+	existingUser.Email = payload.Email
+	existingUser.FirstName = payload.FirstName
+	existingUser.LastName = payload.LastName
+	existingUser.PhoneNumber = payload.PhoneNumber
+	// Add other fields you want to update
+
+	// Save the updated user information
+	updateResult := db.DB.DB.Save(&existingUser)
+	if updateResult.Error != nil {
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("something went wrong with updating the user, try again"))
+		return
+	}
+
+	// Respond with the updated user information
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"message": "User updated successfully",
+		"user":    existingUser,
+	})
+}
+
+// PostUser handles creating a new user
+func (h *AdminHandler) PostUser(w http.ResponseWriter, r *http.Request) {
+	// Parse the json body
+	var payload struct {
+		FirstName   string   `json:"firstName"`
+		LastName    string   `json:"lastName"`
+		Email       string   `json:"email"`
+		PhoneNumber string   `json:"phoneNumber"`
+		RolesIDs    []string `json:"rolesIDs"`
+	}
+
+	if err := utils.ParseJson(r, &payload); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, err)
+		return
+	}
+	// Create user model from payload
+	user := models.User{
+		FirstName:   payload.FirstName,
+		LastName:    payload.LastName,
+		Email:       payload.Email,
+		PhoneNumber: payload.PhoneNumber,
+	}
+
 	// validate input
-	if errs := middleware.ValidateUserInput(payload); len(errs) != 0 {
+	if errs := middleware.ValidateUserInput(user); len(errs) != 0 {
 		utils.WriteInputValidationError(w, http.StatusConflict, errs)
 		return
 	}
 
-	var existingUser models.User
-	// check if the user exists
-	result := db.DB.DB.Where("email = ?", payload.Email).First(&existingUser)
-
-	if result.Error == nil {
-		// User does exist
-		if existingUser.Email == payload.Email {
-			err := middleware.InputValidationError{
-				Type:  "invalid",
-				Value: payload.Email,
-				Msg:   "An account with this E-mail already exists",
-				Path:  "email",
-			}
-
-			utils.WriteInputValidationError(w, http.StatusConflict, err)
-			return
-		}
-	}
-
-	// User doesn't exist
-	// Hash the users password
-	hashedPassword, err := utils.HashPassword(payload.Password)
+	randomPassword := utils.GenerateRandomPassword(12)
+	hashedPassword, err := utils.HashPassword(randomPassword)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
-	payload.Password = hashedPassword
+	user.Password = hashedPassword
 
+	// Start a database transaction
+	tx := db.DB.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Check if user exists
+	var existingUser models.User
+	if result := tx.Where("email = ?", user.Email).First(&existingUser); result.Error == nil {
+		tx.Rollback()
+		err := middleware.InputValidationError{
+			Type:  "invalid",
+			Value: user.Email,
+			Msg:   "An account with this E-mail already exists",
+			Path:  "email",
+		}
+		utils.WriteInputValidationError(w, http.StatusConflict, err)
+		return
+	}
 	// Create the user
-	result = db.DB.DB.Create(&payload)
-	if result.Error != nil {
-		utils.WriteError(w, http.StatusInternalServerError, errors.New("something went wrong with creating your user, please try again"))
+	if err := tx.Create(&user).Error; err != nil {
+		tx.Rollback()
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to create user"))
+		return
+	}
+	// Handle roles assignment
+	if len(payload.RolesIDs) > 0 {
+		// Verify roles exist and assign them
+		for _, roleIDStr := range payload.RolesIDs {
+			var dbRole models.Role
+			if err := tx.Where("id = ?", roleIDStr).First(&dbRole).Error; err != nil {
+				tx.Rollback()
+				utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("role with ID %s not found", roleIDStr))
+				return
+			}
+			if err := tx.Model(&user).Association("Roles").Append(&dbRole); err != nil {
+				tx.Rollback()
+				utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to assign roles"))
+				return
+			}
+		}
+	}
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+	// Fetch the complete user with roles for response
+	var completeUser models.User
+	if err := db.DB.DB.Preload("Roles").First(&completeUser, user.ID).Error; err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
 
+	// Create verification token
+	verificationToken, err := auth.CreateVerificationToken(completeUser.ID, completeUser.Email)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Construct the frontend verification URL
+	verificationURL := fmt.Sprintf("%s/account-activation?token=%s", config.Envs.FrontendURL, verificationToken)
+
+	// Email content
+	emailBody := fmt.Sprintf(`
+	<h1>Account Created Successfully</h1>
+	<p>Hello %s,</p>
+	<p>Your account has been created successfully. Please verify your email by clicking the link below:</p>
+	<p><a href="%s">Verify Your Email</a></p>
+	<p>If you did not request this, please ignore this email.</p>
+`, completeUser.FirstName, verificationURL)
+
+	// Send email
+	err = utils.SendEmail(completeUser.Email, "Account Verification", emailBody)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Send success response
 	utils.WriteJson(w, http.StatusCreated, map[string]interface{}{
-		"message": "User created successfully",
-		"user":    payload,
+		"message": "User created successfully. A verification email has been sent.",
+		"user":    completeUser,
 	})
+
 }
 
 func (h *AdminHandler) GetRoles(w http.ResponseWriter, _ *http.Request) {
@@ -176,7 +343,6 @@ func (h *AdminHandler) GetRoles(w http.ResponseWriter, _ *http.Request) {
 		"roles":   roles,
 	})
 }
-
 func (h *AdminHandler) CreateRole(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		Name string `json:"name"`
@@ -277,7 +443,7 @@ func (h *AdminHandler) DeleteRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Proceed with deleting the role if no users are assigned
-	result = db.DB.DB.Where("name = ?", roleName).Delete(&models.Role{})
+	result = db.DB.DB.Unscoped().Where("name = ?", roleName).Delete(&models.Role{})
 	if result.Error != nil {
 		utils.WriteError(w, http.StatusInternalServerError, result.Error)
 		return

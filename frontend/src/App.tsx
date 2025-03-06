@@ -23,7 +23,6 @@ import Navbar from "./components/navbar/Navbar";
 import { UserProps } from "./types";
 import ProfilePage from "./pages/user/ProfilePage";
 import AdminSpace from "./pages/admin/AdminSpace";
-import AdminUserEdit from "./components/admin/user/AdminUserEdit";
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -33,9 +32,10 @@ const App: React.FC = () => {
     CreatedAt: "",
     UpdatedAt: "",
     DeletedAt: "",
-    username: "",
     email: "",
     phoneNumber: "",
+    firstName: "",
+    lastName: "",
     Roles: [],
   });
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
@@ -59,27 +59,34 @@ const App: React.FC = () => {
     navigate("/");
   };
 
-  const handleLogin = useCallback(async () => {
-    const userID = localStorage.getItem("userID");
-    if (!userID) {
-      setIsLoading(false);
-      return;
-    }
-    try {
-      const res = await fetch(`${apiUrl}/user/${userID}`);
+  const handleLogin = useCallback(
+    async (token: string) => {
+      const userID = localStorage.getItem("userID");
+      if (!userID) {
+        setIsLoading(false);
+        return;
+      }
+      try {
+        const res = await fetch(`${apiUrl}/user/${userID}`, {
+          headers: {
+            Authorization: "Bearer " + token,
+          },
+        });
 
-      const resData = await res.json();
+        const resData = await res.json();
 
-      if (resData.error) throw resData.error;
+        if (resData.error) throw resData.error;
 
-      setUser(resData.user);
-      setIsAuth(true);
-    } catch (err) {
-      handleLogout();
-    } finally {
-      setIsLoading(false);
-    }
-  }, [apiUrl]);
+        setUser(resData.user);
+        setIsAuth(true);
+      } catch (err) {
+        handleLogout();
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [apiUrl]
+  );
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -107,7 +114,7 @@ const App: React.FC = () => {
       setIsLoading(false);
       return;
     }
-    handleLogin();
+    handleLogin(token);
   }, [handleLogin]);
 
   useEffect(() => {
@@ -150,34 +157,19 @@ const App: React.FC = () => {
                   path="/profile/:userID"
                   element={<ProfilePage activeUser={user} />}
                 />
-                {/* Nested account routes */}
-                <Route path="/account">
-                  {/* Default route: redirect to settings */}
-                  <Route index element={<Navigate to="settings" replace />} />
-                  <Route
-                    path=":section"
-                    element={
-                      <UserSpace handleLogout={handleLogout} user={user} />
-                    }
-                  />
-                </Route>
-                <Route path="/admin">
-                  {/* Default route: redirect to settings */}
-                  <Route index element={<Navigate to="dashboard" replace />} />
-                  <Route
-                    path=":dashbaord"
-                    element={
-                      <AdminSpace handleLogout={handleLogout} user={user} />
-                    }
-                  />
-                  <Route
-                    path=":users"
-                    element={
-                      <AdminSpace handleLogout={handleLogout} user={user} />
-                    }
-                  />
-                </Route>
-                <Route path="*" element={<Navigate to="/" replace />} />
+                <Route
+                  path="/account/*"
+                  element={
+                    <UserSpace user={user} handleLogout={handleLogout} />
+                  }
+                />
+                <Route
+                  path="/admin/*"
+                  element={
+                    <AdminSpace user={user} handleLogout={handleLogout} />
+                  }
+                />
+                <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             )}
           </Box>

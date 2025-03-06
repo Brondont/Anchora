@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/Brondont/trust-api/db"
@@ -33,21 +34,36 @@ func (h *GeneralHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch user from database, excluding sensitive information
+	// Validate the JWT token
+	claims, err := auth.ValidateToken(r)
+	if err != nil {
+		utils.WriteError(w, http.StatusUnauthorized, err)
+		return
+	}
+
+	// Extract the userID from the token
+	tokenUserID, ok := claims["userID"].(string)
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, errors.New("invalid token claims"))
+		return
+	}
+
+	// Check if the user is an admin or the same user
+	isAdmin := auth.HasRole(claims, "admin")
+	if !isAdmin && tokenUserID == userID {
+		utils.WriteError(w, http.StatusForbidden, errors.New("insufficient permissions"))
+		return
+	}
+
+	// Fetch user from database
 	var user models.User
-	result := db.DB.DB.Preload("Roles").Select(
-		"id", "email", "username", "created_at",
-		// Add other non-sensitive fields you want to return
-	).Where("id = ?", userID).First(&user)
+	result := db.DB.DB.Preload("Roles").Select("id", "email", "first_name", "last_name", "phone_number").Where("id = ?", userID).First(&user)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			err := errors.New("user not found")
-			utils.WriteError(w, http.StatusNotFound, err)
+			utils.WriteError(w, http.StatusNotFound, errors.New("user not found"))
 			return
 		}
-
-		// Handle other potential database errors
 		utils.WriteError(w, http.StatusInternalServerError, errors.New("something went wrong with getting the user, try again"))
 		return
 	}
@@ -105,5 +121,28 @@ func (h *GeneralHandler) PostLogin(w http.ResponseWriter, r *http.Request) {
 		"message": "User validated",
 		"token":   token,
 		"userID":  user.ID,
+	})
+}
+
+func (h *GeneralHandler) GetUserProfile(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userID"]
+
+	if userID == "" {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("user id is missing from the url"))
+		return
+	}
+
+	var userProfile models.User
+	result := db.DB.DB.Select("id", "first_name", "last_name", "email", "phone_number", "reputation").Where("id = ?", userID).First(&userProfile)
+	if result.Error != nil {
+		fmt.Println(result.Error)
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("something went wrong with loading user profile, try again later."))
+		return
+	}
+
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"message": "user profile successfully fetched",
+		"user":    userProfile,
 	})
 }

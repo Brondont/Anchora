@@ -25,22 +25,24 @@ func ValidateToken(r *http.Request) (jwt.MapClaims, error) {
 
 	token := tokenParts[1]
 
+	// Parse and validate the token
 	parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
-		if token.Method != jwt.SigningMethodHS256 {
+		// Ensure the signing method matches
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
 		}
 		return []byte(config.Envs.JWTSecret), nil
 	})
-	if err != nil || !parsedToken.Valid {
-		return nil, errors.New("invalid token")
+	if err != nil {
+		return nil, errors.New("invalid token: " + err.Error())
 	}
 
-	claims, ok := parsedToken.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, errors.New("unable to extract JWT token info")
+	// Extract claims safely
+	if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok && parsedToken.Valid {
+		return claims, nil
 	}
 
-	return claims, nil
+	return nil, errors.New("unable to extract JWT claims")
 }
 
 // HasRole checks if a user has the required role.
@@ -51,14 +53,10 @@ func HasRole(claims jwt.MapClaims, requiredRole string) bool {
 	}
 
 	for _, role := range roles {
-		roleStr, ok := role.(string)
-		if !ok {
-			continue
-		}
-
-		// Admin has access to everything
-		if roleStr == "admin" || roleStr == requiredRole {
-			return true
+		if roleStr, ok := role.(string); ok {
+			if roleStr == "admin" || roleStr == requiredRole {
+				return true
+			}
 		}
 	}
 	return false

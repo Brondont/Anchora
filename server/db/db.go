@@ -33,9 +33,15 @@ func ConnectDB() {
 	log.Println("Server connected to database")
 
 	log.Println("Running migrations")
+
 	db.AutoMigrate(
-		&models.User{},
 		&models.Role{},
+		&models.User{},
+		&models.Contract{},
+		&models.ContractRules{},
+		&models.Document{},
+		&models.Bid{},
+		&models.ExpertEvaluation{},
 	)
 	DB = DBInstance{
 		DB: db,

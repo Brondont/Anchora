@@ -1,26 +1,17 @@
 import React, { useState, useCallback } from "react";
-import { Box, Typography, useTheme, Link } from "@mui/material";
+import { Box, Typography, Link } from "@mui/material";
 import LoginForm, { LoginFormProps } from "./LoginForm";
 import { useFeedback } from "../../FeedbackAlertContext";
 import { useNavigate } from "react-router-dom";
-
-type ServerFormError = {
-  type: string;
-  value: string;
-  msg: string;
-  path: string;
-  location: string;
-};
-
+import { ServerFormError } from "../../types";
 type LoginPageProps = {
-  handleLogin: () => void;
+  handleLogin: (toke: string) => void;
 };
 
 const LoginPage: React.FC<LoginPageProps> = ({ handleLogin }) => {
-  const theme = useTheme();
   const [loginForm, setLoginForm] = useState<LoginFormProps>({
-    email: { value: "", valid: true, error: "" },
-    password: { value: "", valid: true, error: "" },
+    email: { value: "", error: "" },
+    password: { value: "", error: "" },
   });
   const [isSending, setIsSending] = useState<boolean>(false);
   const [isShake, setIsShake] = useState<boolean>(false);
@@ -54,13 +45,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ handleLogin }) => {
     let isValid = true;
 
     if (!updatedForm.email.value) {
-      updatedForm.email.valid = false;
       updatedForm.email.error = "Email is required";
       isValid = false;
     }
 
     if (!updatedForm.password.value) {
-      updatedForm.password.valid = false;
       updatedForm.password.error = "Password is required";
       isValid = false;
     }
@@ -101,7 +90,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ handleLogin }) => {
           resData.error.forEach((err: ServerFormError) => {
             if (updatedForm[err.path]) {
               updatedForm[err.path].error = err.msg;
-              updatedForm[err.path].valid = false;
             }
           });
           setLoginForm(updatedForm);
@@ -118,7 +106,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ handleLogin }) => {
 
       showFeedback("You are logged in! Redirecting to your dashboard...", true);
       setTimeout(() => {
-        handleLogin();
+        handleLogin(resData.token);
         navigate("/");
       }, 2500);
     } catch (err) {
