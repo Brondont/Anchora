@@ -15,6 +15,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ handleLogin }) => {
   });
   const [isSending, setIsSending] = useState<boolean>(false);
   const [isShake, setIsShake] = useState<boolean>(false);
+  const [generalError, setGeneralError] = useState<string>("");
   const navigate = useNavigate();
   const { showFeedback } = useFeedback();
 
@@ -88,6 +89,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ handleLogin }) => {
         if ([422, 409, 404, 401].includes(res.status)) {
           const updatedForm: LoginFormProps = { ...loginForm };
           resData.error.forEach((err: ServerFormError) => {
+            if (err.path === "general") {
+              setGeneralError(err.msg);
+              return;
+            }
             if (updatedForm[err.path]) {
               updatedForm[err.path].error = err.msg;
             }
@@ -132,6 +137,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ handleLogin }) => {
         loginForm={loginForm}
         isShake={isShake}
         isSending={isSending}
+        generalError={generalError}
         inputChangeHandler={inputChangeHandler}
         handleSubmitLogin={handleSubmitLogin}
       />

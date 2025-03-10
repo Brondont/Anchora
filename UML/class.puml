@@ -1,79 +1,165 @@
-@startuml classDiagram
-
+@startuml class
 left to right direction
+skinparam linetype ortho
+skinparam ArrowFontSize 10
 
-    class Role {
-        +ID uint
-        +Name string
-    }
+class User {
+  +ID: uint
+  +firstName: string
+  +lastName: string
+  +email: string
+  +password: string
+  +phoneNumber: string
+  +accountActivationHash: string
+  +isActive: boolean
+  +createdAt: time.Time
+  +updatedAt: time.Time
+  +deletedAt: time.Time
+}
 
-    class User {
-        +ID uint
-        +FirstName string
-        +LastName string
-        +Email string
-        +Password string
-        +PhoneNumber string
-        +Reputation float64
-    }
+class Admin {
+  +manageUsers()
+  +overseeSystem()
+  +monitorProcesses()
+}
 
-    class Document {
-        +ID uint
-        +FileName string
-        +URL string
-        +DocumentableID uint
-        +DocumentableType string
-    }
+class Entrepreneur {
+  +reputation: float
+  +submitProposal()
+  +viewOffers()
+}
 
-    class ContractRules {
-        +ID uint
-        +Name string
-        +Description string
-    }
+class TenderAdministrator {
+  +name: string
+  +createOffer()
+  +manageOffers()
+}
 
-    class Contract {
-        +ID uint
-        +Title string
-        +Description string
-        +CreatedBy uint
-        +Budget float64
-        +Currency string
-        +Category string
-        +Location string
-        +BidDeadline time.Time
-        +ContractStart time.Time
-        +ContractEnd time.Time
-        +WinningBidID uint
-        +Status string
-    }
+' Expanded Expert class to include additional proof-of-stake properties
+class Expert {
+  +specialization: string
+  +stakeAmount: float
+  +stakeWeight: float
+  +nodeReputation: float
+  +yearsExperience: int
+  +nodeID: string
+  +evaluateProposal()
+  +updateStake(amount: float)
+  +calculateStakeWeight(): float
+  +updateReputation(score: float)
+}
 
-    class Bid {
-        +ID uint
-        +ContractID uint
-        +BidderID uint
-        +Details string
-        +Status string
-        +SubmittedAt time.Time
-    }
+class Role {
+  +ID: uint
+  +name: string
+  +createdAt: time.Time
+  +updatedAt: time.Time
+  +deletedAt: time.Time
+}
 
-    class ExpertEvaluation {
-        +ID uint
-        +BidID uint
-        +Score float64
-        +Comments string
-        +EvaluatedAt time.Time
-        +Weight float64
-    }
+class Offer {
+  +ID: uint
+  +title: string
+  +description: string
+  +budget: float
+  +currency: string
+  +category: string
+  +location: string
+  +bidDeadline: time.Time
+  +contractStart: time.Time
+  +status: string
+  +winningProposalID: uint
+  +createdBy: uint
+  +createdAt: time.Time
+  +updatedAt: time.Time
+  +deletedAt: time.Time
+}
 
-    User "*" --o "*" Role
-    User "1" --o "*" Document
-    Contract "1" --o "*" Document
-    Contract "*" --o "*" ContractRules
-    Contract "1" --o "*" Bid
-    User "1" --o "*" Bid
-    User "1" --o "*" Contract
-    Bid "0..1" --o "1" Contract
-    Bid "1" --o "*" ExpertEvaluation
-    User "1" --o "*" ExpertEvaluation
+' Updated Proposal class based on Algerian public tender practices
+class Proposal {
+  +ID: uint
+  +offerID: uint
+  +entrepreneurID: uint
+  +technicalProposal: string     
+  +financialOffer: float         
+  +timeline: string              
+  +requiredManpower: int         
+  +bidBondAmount: float            
+  +pastExperience: string          
+  +status: string
+  +submittedAt: time.Time
+  +finalScore: float
+  +createdAt: time.Time
+  +updatedAt: time.Time
+  +deletedAt: time.Time
+}
 
-    @enduml
+class POSVote {
+  +ID: uint
+  +proposalID: uint
+  +expertID: uint
+  +voteScore: float
+  +comments: string
+  +weight: float
+  +evaluatedAt: time.Time
+  +createdAt: time.Time
+  +updatedAt: time.Time
+  +deletedAt: time.Time
+}
+
+class Document {
+  +ID: uint
+  +name: string
+  +url: string
+  +documentableID: uint
+  +documentableType: string
+  +size: int
+  +fileType: string
+  +uploadedBy: uint
+  +createdAt: time.Time
+  +updatedAt: time.Time
+  +deletedAt: time.Time
+}
+
+class OfferRules {
+  +ID: uint
+  +name: string
+  +description: string
+  +createdAt: time.Time
+  +updatedAt: time.Time
+  +deletedAt: time.Time
+}
+
+class SmartContract {
+  +ID: uint
+  +offerID: uint
+  +entrepreneurID: uint
+  +terms: string
+  +contractAddress: string
+  +status: string
+  +createdAt: time.Time
+  +updatedAt: time.Time
+}
+
+User <|-- Admin
+User <|-- Entrepreneur
+User <|-- TenderAdministrator
+User <|-- Expert
+
+User "*" -- "*" Role
+
+TenderAdministrator "1" -- "*" Offer : creates
+Entrepreneur "1" -- "*" Proposal : submits
+Offer "1" -- "*" Proposal : receives
+Expert "1" -- "*" POSVote : casts
+Proposal "1" -- "*" POSVote : evaluatedBy
+
+Offer "1" -- "0..1" SmartContract : resultsIn
+Entrepreneur "1" -- "0..1" SmartContract : signs
+
+Offer "*" -- "*" OfferRules
+Document "*" -- "1" Offer : attachedTo
+Document "*" -- "1" Proposal : attachedTo
+Document "*" -- "1" User : uploadedBy
+
+@enduml

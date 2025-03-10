@@ -37,15 +37,15 @@ export const isRequired: ValidatorFunction = (value) => {
 export const isLength = (config: LengthConfig) => {
   return (value: string) => {
     let isValid = true;
-    let errorMessage = "";
+    let errorMessage = config.min
+      ? `Must be at least ${config.min} characters.`
+      : `Must be no more than ${config.max} characters.`;
 
     if (config.min && value.trim().length < config.min) {
       isValid = false;
-      errorMessage = `Must be at least ${config.min} characters.`;
     }
     if (config.max && value.trim().length > config.max) {
       isValid = false;
-      errorMessage = `Must be no more than ${config.max} characters.`;
     }
 
     return { isValid, errorMessage };
@@ -68,4 +68,25 @@ export const isGender: ValidatorFunction = (value: string) => ({
 export const isPostalCode: ValidatorFunction = (value: string) => ({
   isValid: /^\d{5}(-\d{4})?$/.test(value),
   errorMessage: "Please enter a valid postal code.",
+});
+
+// Individual validation functions
+export const isPasswordLengthValid: ValidatorFunction = (password) => ({
+  isValid: password.length >= 8,
+  errorMessage: "Password must be at least 8 characters long.",
+});
+
+export const hasUppercase: ValidatorFunction = (password) => ({
+  isValid: /[A-Z]/.test(password),
+  errorMessage: "Password must contain at least one uppercase letter.",
+});
+
+export const hasNumber: ValidatorFunction = (password) => ({
+  isValid: /\d/.test(password),
+  errorMessage: "Password must contain at least one number.",
+});
+
+export const hasSpecialChar: ValidatorFunction = (password) => ({
+  isValid: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  errorMessage: "Password must contain at least one special character.",
 });

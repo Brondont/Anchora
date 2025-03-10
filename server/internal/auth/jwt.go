@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Brondont/trust-api/config"
-	"github.com/Brondont/trust-api/db"
 	"github.com/Brondont/trust-api/models"
 	"github.com/Brondont/trust-api/utils"
 	"github.com/golang-jwt/jwt/v5"
@@ -50,9 +49,8 @@ func CreateJWT(userID uint, roles []models.Role) (string, error) {
 }
 
 // CrateVerificationToken creates the verification token for account
-func CreateVerificationToken(userID uint, email string) (string, error) {
+func CreateVerificationToken(email string) (string, string, error) {
 	claims := VerificationClaims{
-		UserID:    userID,
 		Email:     email,
 		TokenType: TokenType,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -64,57 +62,44 @@ func CreateVerificationToken(userID uint, email string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(config.Envs.JWTSecret))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// Store token hash in the database
 	tokenHash := utils.HashSHA256(tokenString)
 
-	// Update user with verification token hash
-	result := db.DB.DB.Model(&models.User{}).Where("id = ?", userID).Update("account_activation_hash", tokenHash)
-	if result.Error != nil {
-		return "", result.Error
-	}
-
-	return tokenString, nil
+	return tokenHash, tokenString, nil
 }
 
-// ValidateVerificationToken validates the token and returns the user information if valid
-func ValidateVerificationToken(tokenString string) (*models.User, error) {
+// ParseVerificationToken validates and parses a verification token, returning the claims
+func ParseVerificationToken(tokenString string) (*VerificationClaims, error) {
 	// Parse the token
 	token, err := jwt.ParseWithClaims(tokenString, &VerificationClaims{}, func(token *jwt.Token) (interface{}, error) {
+		// Validate the signing method
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
 		return []byte(config.Envs.JWTSecret), nil
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to parse token: " + err.Error())
 	}
 
-	// Check if token is valid
-	claims, ok := token.Claims.(*VerificationClaims)
-	if !ok || !token.Valid {
-		return nil, errors.New("invalid token")
+	// Extract claims
+	if claims, ok := token.Claims.(*VerificationClaims); ok && token.Valid {
+		// Verify token type
+		if claims.TokenType != TokenType {
+			return nil, errors.New("invalid token type")
+		}
+
+		// Check token expiration
+		if claims.ExpiresAt.Time.Before(time.Now()) {
+			return nil, errors.New("token has expired")
+		}
+
+		return claims, nil
 	}
 
-	// Check token type
-	if claims.TokenType != TokenType {
-		return nil, errors.New("invalid token type")
-	}
-
-	// Fetch the user
-	var user models.User
-	if err := db.DB.DB.Where("id = ? AND email = ?", claims.UserID, claims.Email).First(&user).Error; err != nil {
-		return nil, err
-	}
-
-	// Check if token has been used (if account_activation_hash is empty, token has been used)
-	if user.AccountActivationHash == "" {
-		return nil, errors.New("token has already been used")
-	}
-
-	return &user, nil
+	return nil, errors.New("invalid token claims")
 }
-
-// TODO WE NEED TO ACDTUALLY IMPLEMENT THIS ACCOUNT ACTIVATION TYPE SYSTEM ITS REALLLY COOOOOOL
-// TODO imporve how we handle user tokens, look into Refresh and Access token for bettter security, currently
-// TODO storing the token on the frontend in localstorage which is really bad

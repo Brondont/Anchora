@@ -1,0 +1,274 @@
+@startuml class-blockchain
+left to right direction
+skinparam linetype ortho
+skinparam ArrowFontSize 10
+
+' Core entity classes
+class User {
+  +ID: uint
+  +walletAddress: string
+  +publicKey: string
+  +firstName: string
+  +lastName: string
+  +email: string
+  +password: string
+  +phoneNumber: string
+  +accountActivationHash: string
+  +isActive: boolean
+  +transactionHistory: array
+  +createdAt: timestamp
+  +updatedAt: timestamp
+  +deletedAt: timestamp
+}
+
+class Role {
+  +ID: uint
+  +name: string
+  +description: string
+  +permissions: array
+  +createdAt: timestamp
+  +updatedAt: timestamp
+  +deletedAt: timestamp
+}
+
+' User types
+class Admin {
+  +manageUsers()
+  +overseeSystem()
+  +monitorProcesses()
+  +manageSmartContracts()
+}
+
+class Entrepreneur {
+  +reputation: float
+  +stakeAmount: float
+  +companyRegistration: string
+  +taxIdentification: string
+  +verificationStatus: string
+  +submitProposal()
+  +viewOffers()
+  +signSmartContract()
+}
+
+class TenderAdministrator {
+  +name: string
+  +department: string
+  +authorityLevel: string
+  +verificationStatus: string
+  +createOffer()
+  +manageOffers()
+  +finalizeContract()
+}
+
+class Expert {
+  +specialization: string
+  +stakeAmount: float
+  +stakeWeight: float
+  +nodeReputation: float
+  +yearsExperience: int
+  +nodeID: string
+  +consensusParticipation: boolean
+  +stakeLockPeriod: timestamp
+  +rewardsAccumulated: float
+  +evaluateProposal()
+  +updateStake(amount: float)
+  +calculateStakeWeight(): float
+  +updateReputation(score: float)
+  +participateInConsensus()
+}
+
+' Main business entities
+class Offer {
+  +ID: uint
+  +transactionHash: string
+  +blockNumber: uint
+  +title: string
+  +description: string
+  +budget: float
+  +currency: string
+  +category: string
+  +location: string
+  +bidDeadline: timestamp
+  +contractStart: timestamp
+  +contractEnd: timestamp
+  +status: string
+  +minRequiredExpertStake: float
+  +evaluationCriteria: array
+  +winningProposalID: uint
+  +createdBy: uint
+  +createdAt: timestamp
+  +updatedAt: timestamp
+  +deletedAt: timestamp
+}
+
+class Proposal {
+  +ID: uint
+  +transactionHash: string
+  +blockNumber: uint
+  +offerID: uint
+  +entrepreneurID: uint
+  +technicalProposal: string
+  +financialOffer: float
+  +timeline: string
+  +requiredManpower: int
+  +administrativeCompliance: boolean
+  +bidBondAmount: float
+  +pastExperience: string
+  +proposalHash: string
+  +status: string
+  +submittedAt: timestamp
+  +finalScore: float
+  +createdAt: timestamp
+  +updatedAt: timestamp
+  +deletedAt: timestamp
+}
+
+class POSVote {
+  +ID: uint
+  +transactionHash: string
+  +blockNumber: uint
+  +proposalID: uint
+  +expertID: uint
+  +voteScore: float
+  +comments: string
+  +weight: float
+  +voteHash: string
+  +evaluatedAt: timestamp
+  +validationConsensus: boolean
+  +rewardAmount: float
+  +createdAt: timestamp
+  +updatedAt: timestamp
+  +deletedAt: timestamp
+}
+
+class Document {
+  +ID: uint
+  +name: string
+  +url: string
+  +documentableID: uint
+  +documentableType: string
+  +size: int
+  +fileType: string
+  +uploadedBy: uint
+  +ipfsHash: string
+  +documentHash: string
+  +transactionHash: string
+  +blockNumber: uint
+  +createdAt: timestamp
+  +updatedAt: timestamp
+  +deletedAt: timestamp
+}
+
+' Contract-related classes
+class OfferRules {
+  +ID: uint
+  +name: string
+  +description: string
+  +ruleLogic: string
+  +triggerConditions: array
+  +penalty: float
+  +createdAt: timestamp
+  +updatedAt: timestamp
+  +deletedAt: timestamp
+}
+
+class SmartContract {
+  +ID: uint
+  +offerID: uint
+  +entrepreneurID: uint
+  +terms: string
+  +contractAddress: string
+  +transactionHash: string
+  +blockNumber: uint
+  +status: string
+  +milestones: array
+  +paymentSchedule: array
+  +terminationConditions: array
+  +disputeResolution: string
+  +signaturesRequired: array
+  +signaturesComplete: array
+  +createdAt: timestamp
+  +updatedAt: timestamp
+}
+
+' Blockchain-specific classes
+class Transaction {
+  +hash: string
+  +blockNumber: uint
+  +timestamp: timestamp
+  +from: string
+  +to: string
+  +value: float
+  +data: string
+  +status: string
+  +gas: uint
+  +gasPrice: uint
+}
+
+class Block {
+  +number: uint
+  +hash: string
+  +parentHash: string
+  +timestamp: timestamp
+  +validator: string
+  +transactionCount: uint
+  +size: uint
+  +stateRoot: string
+}
+
+class ConsensusRound {
+  +ID: uint
+  +startTime: timestamp
+  +endTime: timestamp
+  +participatingExperts: array
+  +proposalIDs: array
+  +status: string
+  +consensusResult: string
+  +blockNumber: uint
+}
+
+class Reward {
+  +ID: uint
+  +expertID: uint
+  +amount: float
+  +transactionHash: string
+  +rewardType: string
+  +consensusRoundID: uint
+  +createdAt: timestamp
+}
+
+' Relationships
+User <|-- Admin
+User <|-- Entrepreneur
+User <|-- TenderAdministrator
+User <|-- Expert
+User "*" -- "*" Role
+
+TenderAdministrator "1" -- "*" Offer : creates
+Entrepreneur "1" -- "*" Proposal : submits
+Offer "1" -- "*" Proposal : receives
+Expert "1" -- "*" POSVote : casts
+Proposal "1" -- "*" POSVote : evaluatedBy
+Expert "*" -- "*" ConsensusRound : participatesIn
+Expert "1" -- "*" Reward : earns
+
+Offer "1" -- "0..1" SmartContract : resultsIn
+Entrepreneur "1" -- "0..1" SmartContract : signs
+TenderAdministrator "1" -- "0..1" SmartContract : approves
+
+Offer "*" -- "*" ContractRules
+SmartContract "*" -- "*" ContractRules : implements
+
+Document "*" -- "1" Offer : attachedTo
+Document "*" -- "1" Proposal : attachedTo
+Document "*" -- "1" User : uploadedBy
+
+Transaction "*" -- "1" Offer : records
+Transaction "*" -- "1" Proposal : records
+Transaction "*" -- "1" POSVote : records
+Transaction "*" -- "1" SmartContract : records
+Transaction "*" -- "1" Document : records
+
+Block "1" -- "*" Transaction : contains
+Block "*" -- "1" ConsensusRound : validates
+@enduml

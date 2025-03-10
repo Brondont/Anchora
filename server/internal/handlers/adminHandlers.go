@@ -261,12 +261,22 @@ func (h *AdminHandler) PostUser(w http.ResponseWriter, r *http.Request) {
 		utils.WriteInputValidationError(w, http.StatusConflict, err)
 		return
 	}
+
+	// Create verification token
+	verificationTokenHash, verificationToken, err := auth.CreateVerificationToken(user.Email)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+	user.AccountActivationHash = verificationTokenHash
+
 	// Create the user
 	if err := tx.Create(&user).Error; err != nil {
 		tx.Rollback()
 		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to create user"))
 		return
 	}
+
 	// Handle roles assignment
 	if len(payload.RolesIDs) > 0 {
 		// Verify roles exist and assign them
@@ -284,6 +294,7 @@ func (h *AdminHandler) PostUser(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
@@ -295,16 +306,8 @@ func (h *AdminHandler) PostUser(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
-
-	// Create verification token
-	verificationToken, err := auth.CreateVerificationToken(completeUser.ID, completeUser.Email)
-	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, err)
-		return
-	}
-
 	// Construct the frontend verification URL
-	verificationURL := fmt.Sprintf("%s/account-activation?token=%s", config.Envs.FrontendURL, verificationToken)
+	verificationURL := fmt.Sprintf("%s/activation?token=%s", config.Envs.FrontendURL, verificationToken)
 
 	// Email content
 	emailBody := fmt.Sprintf(`

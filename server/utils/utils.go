@@ -2,6 +2,7 @@ package utils
 
 import (
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -243,7 +244,14 @@ func SendEmail(to, subject, body string) error {
 	return nil
 }
 
+// HashSHA256: hashes a string using SHA-256 and returns the hex-encoded result.
 func HashSHA256(value string) string {
 	hash := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(hash[:])
+}
+
+// VerifySHA256: verifies if a value's hash matches the given hash string.
+func VerifySHA256(value string, valueHash string) bool {
+	hash := HashSHA256(value)
+	return subtle.ConstantTimeCompare([]byte(hash), []byte(valueHash)) == 1
 }

@@ -19,6 +19,7 @@ import {
   MenuItem,
   ListItemText,
   ListItemIcon,
+  Button,
 } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
 import {
@@ -219,13 +220,13 @@ const UserManagement: React.FC = () => {
                   },
                 }}
               />
-              <LoadingButton
+              <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                loading={isProcessing}
+                onClick={() => navigate("/admin/user-details")}
               >
                 Add User
-              </LoadingButton>
+              </Button>
               <LoadingButton
                 variant="outlined"
                 onClick={() => {

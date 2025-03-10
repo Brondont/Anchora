@@ -23,6 +23,7 @@ type User struct {
 	Roles                 []Role     `gorm:"many2many:user_roles;"`
 	Certificates          []Document `gorm:"polymorphic:Documentable;"`
 	AccountActivationHash string     `json:"accountActivationHash" gorm:"type:text"`
+	IsActive              bool       `json:"isActive" gorm:"default:false"`
 }
 
 type Bid struct {

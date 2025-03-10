@@ -8,7 +8,6 @@ import {
   Link,
   TextField,
   Typography,
-  useTheme,
 } from "@mui/material";
 import React from "react";
 
@@ -31,6 +30,7 @@ type LoginFormContentProps = {
   loginForm: LoginFormProps;
   isShake: boolean;
   isSending: boolean;
+  generalError: string;
   inputChangeHandler: (value: string, name: string) => void;
   handleSubmitLogin: (event: React.FormEvent) => void;
 };
@@ -39,6 +39,7 @@ const LoginForm: React.FC<LoginFormContentProps> = ({
   loginForm,
   isShake,
   isSending,
+  generalError,
   inputChangeHandler,
   handleSubmitLogin,
 }) => {
@@ -73,7 +74,7 @@ const LoginForm: React.FC<LoginFormContentProps> = ({
                 error={loginForm.email.error !== ""}
                 helperText={loginForm.email.error || ""}
                 sx={{
-                  ...(isShake && !loginForm.email.error
+                  ...(isShake && loginForm.email.error
                     ? { animation: `${shakeAnimation} 0.35s` }
                     : {}),
                 }}
@@ -90,12 +91,24 @@ const LoginForm: React.FC<LoginFormContentProps> = ({
                   inputChangeHandler(event.target.value, "password")
                 }
                 sx={{
-                  ...(isShake && !loginForm.password.error
+                  ...(isShake && loginForm.password.error
                     ? { animation: `${shakeAnimation} 0.35s` }
                     : {}),
                 }}
               />
             </FormControl>
+            {generalError !== "" && (
+              <Typography
+                variant="body1"
+                color="error"
+                textAlign="center"
+                sx={{
+                  ...(isShake ? { animation: `${shakeAnimation} 0.35s` } : {}),
+                }}
+              >
+                {generalError}
+              </Typography>
+            )}
             <LoadingButton
               loading={isSending}
               variant="contained"

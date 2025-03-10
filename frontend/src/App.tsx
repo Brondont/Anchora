@@ -23,6 +23,7 @@ import Navbar from "./components/navbar/Navbar";
 import { UserProps } from "./types";
 import ProfilePage from "./pages/user/ProfilePage";
 import AdminSpace from "./pages/admin/AdminSpace";
+import AccountActivationPage from "./pages/AccountActivationPage";
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -31,14 +32,13 @@ const App: React.FC = () => {
     ID: 0,
     CreatedAt: "",
     UpdatedAt: "",
-    DeletedAt: "",
     email: "",
     phoneNumber: "",
     firstName: "",
     lastName: "",
     Roles: [],
   });
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -149,26 +149,37 @@ const App: React.FC = () => {
             ) : (
               <Routes>
                 <Route path="/" element={<HomePage />} />
-                <Route
-                  path="/login"
-                  element={<LoginPage handleLogin={handleLogin} />}
-                />
-                <Route
-                  path="/profile/:userID"
-                  element={<ProfilePage activeUser={user} />}
-                />
-                <Route
-                  path="/account/*"
-                  element={
-                    <UserSpace user={user} handleLogout={handleLogout} />
-                  }
-                />
-                <Route
-                  path="/admin/*"
-                  element={
-                    <AdminSpace user={user} handleLogout={handleLogout} />
-                  }
-                />
+                {!isAuth ? (
+                  <>
+                    <Route
+                      path="/login"
+                      element={<LoginPage handleLogin={handleLogin} />}
+                    />
+                    <Route
+                      path="/activation"
+                      element={<AccountActivationPage />}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Route
+                      path="/profile/:userID"
+                      element={<ProfilePage activeUser={user} />}
+                    />
+                    <Route
+                      path="/account/*"
+                      element={
+                        <UserSpace user={user} handleLogout={handleLogout} />
+                      }
+                    />
+                    <Route
+                      path="/admin/*"
+                      element={
+                        <AdminSpace user={user} handleLogout={handleLogout} />
+                      }
+                    />
+                  </>
+                )}
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             )}

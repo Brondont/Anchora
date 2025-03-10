@@ -11,6 +11,7 @@ import (
 	"github.com/Brondont/trust-api/models"
 	"github.com/Brondont/trust-api/utils"
 	"github.com/gorilla/mux"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -98,6 +99,18 @@ func (h *GeneralHandler) PostLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// found user -> check if account is active
+	if user.AccountActivationHash != "" {
+		err := middleware.InputValidationError{
+			Type:  "Invalid",
+			Value: "",
+			Msg:   "Your account isn't active, check your email for the activation link.",
+			Path:  "general",
+		}
+		utils.WriteInputValidationError(w, http.StatusUnauthorized, err)
+		return
+	}
+
 	// found user -> validate password
 	if !utils.VerifyPassword(payload.Password, user.Password) {
 		// incorrect password
@@ -137,12 +150,83 @@ func (h *GeneralHandler) GetUserProfile(w http.ResponseWriter, r *http.Request) 
 	result := db.DB.DB.Select("id", "first_name", "last_name", "email", "phone_number", "reputation").Where("id = ?", userID).First(&userProfile)
 	if result.Error != nil {
 		fmt.Println(result.Error)
-		utils.WriteError(w, http.StatusInternalServerError, errors.New("something went wrong with loading user profile, try again later."))
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("something went wrong with loading user profile, try again later"))
 		return
 	}
 
 	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
 		"message": "user profile successfully fetched",
 		"user":    userProfile,
+	})
+}
+
+// ActivateUser handles user activation with the verification token and password setup
+func (h *GeneralHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+
+	if err := utils.ParseJson(r, &payload); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("bad json request"))
+		return
+	}
+
+	// Validate the password
+	passwordErrors := middleware.ValidatePassword(payload.Password)
+	if len(passwordErrors) > 0 {
+		utils.WriteJson(w, http.StatusBadRequest, middleware.ErrorResponse{
+			Error: passwordErrors,
+		})
+		return
+	}
+
+	// Parse and validate the verification token
+	claims, err := auth.ParseVerificationToken(payload.Token)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("invalid token: "+err.Error()))
+		return
+	}
+
+	// Find user by email from the token claims
+	var user models.User
+	if err := db.DB.DB.Where("email = ?", claims.Email).First(&user).Error; err != nil {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("user not found"))
+		return
+	}
+
+	// Check if token has been used (if account_activation_hash is empty, token has been used)
+	if user.AccountActivationHash == "" {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("token has already been used"))
+		return
+	}
+
+	// Verify that the token hash matches the stored hash
+	if !utils.VerifySHA256(payload.Token, user.AccountActivationHash) {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("token hash mismatch"))
+		return
+	}
+
+	// Hash the new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(payload.Password), bcrypt.DefaultCost)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("error processing password"))
+		return
+	}
+
+	// Update user record
+	user.Password = string(hashedPassword)
+	user.IsActive = true
+	user.AccountActivationHash = "" // Clear the activation hash to prevent reuse
+
+	// Save changes to database
+	if err := db.DB.DB.Save(&user).Error; err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to activate account"))
+		return
+	}
+
+	// Return success response with token
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"message": "Account successfully activated",
 	})
 }
