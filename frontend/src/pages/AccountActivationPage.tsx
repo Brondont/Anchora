@@ -17,12 +17,14 @@ import {
   isLength,
 } from "../util/validators";
 import { useFeedback } from "../FeedbackAlertContext";
+import { ServerFormError } from "../types";
 
 const AccountActivationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [generalError, setGeneralError] = useState<string>("");
   const [isShake, setIsShake] = useState<boolean>(false);
   const { showFeedback } = useFeedback();
 
@@ -62,7 +64,7 @@ const AccountActivationPage: React.FC = () => {
     const token = searchParams.get("token");
 
     try {
-      const response = await fetch(`${apiUrl}/user/activate`, {
+      const res = await fetch(`${apiUrl}/user/activate`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -73,7 +75,25 @@ const AccountActivationPage: React.FC = () => {
         }),
       });
 
-      const resData = await response.json();
+      const resData = await res.json();
+
+      if (!res.ok) {
+        if ([422, 409, 404, 401].includes(res.status)) {
+          const updatedForm: PasswordResetFormState = { ...passwordFormState };
+          resData.error.forEach((err: ServerFormError) => {
+            if (err.path === "general") {
+              setGeneralError(err.msg);
+              return;
+            }
+            if (updatedForm[err.path]) {
+              updatedForm[err.path].error = err.msg;
+            }
+          });
+          setPasswordFormState(updatedForm);
+          shakeFields();
+          return;
+        }
+      }
 
       if (resData.error) {
         throw resData.error;
@@ -147,6 +167,7 @@ const AccountActivationPage: React.FC = () => {
           <PasswordResetForm
             passwordFormState={passwordFormState}
             setPasswordFormState={setPasswordFormState}
+            generalError={generalError}
             onSubmit={handleSubmit}
             isSubmitting={isSubmitting}
             submitButtonText="Activate Account"

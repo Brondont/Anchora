@@ -184,7 +184,7 @@ func (h *GeneralHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	// Parse and validate the verification token
 	claims, err := auth.ParseVerificationToken(payload.Token)
 	if err != nil {
-		utils.WriteError(w, http.StatusBadRequest, errors.New("invalid token: "+err.Error()))
+		utils.WriteError(w, http.StatusBadRequest, errors.New("yoru token is invalid, Please request a new activation token"))
 		return
 	}
 

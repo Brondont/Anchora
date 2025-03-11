@@ -46,6 +46,7 @@ interface PasswordResetFormProps {
   onSubmit: () => void;
   isSubmitting: boolean;
   submitButtonText?: string;
+  generalError: string;
   isShake: boolean;
 }
 
@@ -67,6 +68,7 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
   passwordFormState,
   setPasswordFormState,
   onSubmit,
+  generalError,
   isSubmitting,
   submitButtonText = "Submit",
   isShake,
@@ -264,7 +266,18 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
           ),
         }}
       />
-
+      {generalError !== "" && (
+        <Typography
+          variant="body1"
+          color="error"
+          textAlign="center"
+          sx={{
+            ...(isShake ? { animation: `${shakeAnimation} 0.35s` } : {}),
+          }}
+        >
+          {generalError}
+        </Typography>
+      )}
       <LoadingButton
         variant="contained"
         color="primary"
