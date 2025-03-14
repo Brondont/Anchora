@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/Brondont/trust-api/config"
 	"github.com/Brondont/trust-api/db"
 	"github.com/Brondont/trust-api/internal/auth"
 	"github.com/Brondont/trust-api/middleware"
@@ -25,7 +26,7 @@ func NewGeneralHandler() *GeneralHandler {
 	}
 }
 
-// GetUser retrieves user information from db
+// GetUser retrieves user information from the database.
 func (h *GeneralHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userID := vars["userID"]
@@ -35,31 +36,26 @@ func (h *GeneralHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate the JWT token
-	claims, err := auth.ValidateToken(r)
+	// Validate the JWT token using the new typed validation function
+	claims, err := auth.ValidateAuthToken(r)
 	if err != nil {
 		utils.WriteError(w, http.StatusUnauthorized, err)
 		return
 	}
 
-	// Extract the userID from the token
-	tokenUserID, ok := claims["userID"].(string)
-	if !ok {
-		utils.WriteError(w, http.StatusUnauthorized, errors.New("invalid token claims"))
-		return
-	}
-
-	// Check if the user is an admin or the same user
-	isAdmin := auth.HasRole(claims, "admin")
-	if !isAdmin && tokenUserID == userID {
+	// Check if the caller is an admin or is the same user.
+	// Note: We allow access if the user is an admin OR the token's userID equals the requested userID.
+	if !auth.HasRole(claims, "admin") && claims.UserID != userID {
 		utils.WriteError(w, http.StatusForbidden, errors.New("insufficient permissions"))
 		return
 	}
 
 	// Fetch user from database
 	var user models.User
-	result := db.DB.DB.Preload("Roles").Select("id", "email", "first_name", "last_name", "phone_number").Where("id = ?", userID).First(&user)
-
+	result := db.DB.DB.Preload("Roles").
+		Select("id", "email", "first_name", "last_name", "phone_number").
+		Where("id = ?", userID).
+		First(&user)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			utils.WriteError(w, http.StatusNotFound, errors.New("user not found"))
@@ -75,7 +71,7 @@ func (h *GeneralHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// PostLogin handles users login
+// PostLogin handles user login.
 func (h *GeneralHandler) PostLogin(w http.ResponseWriter, r *http.Request) {
 	var payload models.User
 	if err := utils.ParseJson(r, &payload); err != nil {
@@ -83,7 +79,7 @@ func (h *GeneralHandler) PostLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// get user object
+	// Get user object from the database
 	var user models.User
 	result := db.DB.DB.Preload("Roles").Where("email = ?", payload.Email).First(&user)
 	if result.Error != nil {
@@ -94,15 +90,14 @@ func (h *GeneralHandler) PostLogin(w http.ResponseWriter, r *http.Request) {
 			Msg:   "No user found with this email",
 			Path:  "email",
 		}
-
 		utils.WriteInputValidationError(w, http.StatusConflict, err)
 		return
 	}
 
-	// found user -> check if account is active
-	if user.AccountActivationHash != "" {
+	// Check if account is active
+	if !user.IsActive {
 		err := middleware.InputValidationError{
-			Type:  "Invalid",
+			Type:  "invalid",
 			Value: "",
 			Msg:   "Your account isn't active, check your email for the activation link.",
 			Path:  "general",
@@ -111,11 +106,11 @@ func (h *GeneralHandler) PostLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// found user -> validate password
+	// Validate password
 	if !utils.VerifyPassword(payload.Password, user.Password) {
-		// incorrect password
+		// Incorrect password
 		err := middleware.InputValidationError{
-			Type:  "Invalid",
+			Type:  "invalid",
 			Value: "[hidden]",
 			Msg:   "Incorrect user credentials.",
 			Path:  "password",
@@ -123,8 +118,9 @@ func (h *GeneralHandler) PostLogin(w http.ResponseWriter, r *http.Request) {
 		utils.WriteInputValidationError(w, http.StatusUnauthorized, err)
 		return
 	}
-	// password is correct create JWT and return proper response
-	token, err := auth.CreateJWT(user.ID, user.Roles)
+
+	// Password is correct; create a JWT auth token that includes the IsActive flag.
+	token, err := auth.CreateAuthToken(user.ID, user.Roles, user.IsActive)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
@@ -195,18 +191,6 @@ func (h *GeneralHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if token has been used (if account_activation_hash is empty, token has been used)
-	if user.AccountActivationHash == "" {
-		utils.WriteError(w, http.StatusBadRequest, errors.New("token has already been used"))
-		return
-	}
-
-	// Verify that the token hash matches the stored hash
-	if !utils.VerifySHA256(payload.Token, user.AccountActivationHash) {
-		utils.WriteError(w, http.StatusBadRequest, errors.New("token hash mismatch"))
-		return
-	}
-
 	// Hash the new password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(payload.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -217,7 +201,6 @@ func (h *GeneralHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	// Update user record
 	user.Password = string(hashedPassword)
 	user.IsActive = true
-	user.AccountActivationHash = "" // Clear the activation hash to prevent reuse
 
 	// Save changes to database
 	if err := db.DB.DB.Save(&user).Error; err != nil {
@@ -229,4 +212,83 @@ func (h *GeneralHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
 		"message": "Account successfully activated",
 	})
+}
+
+func (h *GeneralHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Email string `json:"email"`
+	}
+	if err := utils.ParseJson(r, &payload); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("failed to parse request data"))
+		return
+	}
+
+	// Validate email is not empty
+	if payload.Email == "" {
+		err := middleware.InputValidationError{
+			Type:  "required",
+			Value: "",
+			Msg:   "Email is required",
+			Path:  "email",
+		}
+		utils.WriteInputValidationError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+
+	// Find the user with the email
+	var user models.User
+	result := db.DB.DB.Where("email = ?", payload.Email).First(&user)
+	if result.Error != nil {
+		// User does not exist
+		utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+			"message": "If an account with that email exists, password reset instructions have been sent",
+		})
+		return
+	}
+
+	// Check if account is active
+	if !user.IsActive {
+		err := middleware.InputValidationError{
+			Type:  "invalid",
+			Value: "",
+			Msg:   "Your account isn't active yet. Please activate your account first.",
+			Path:  "general",
+		}
+		utils.WriteInputValidationError(w, http.StatusUnauthorized, err)
+		return
+	}
+
+	passwordResetToken, err := auth.CreatePasswordResetToken(user.Email, user.Password)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Create reset URL
+	resetURL := fmt.Sprintf("%s/reset-password?token=%s", config.Envs.FrontendURL, passwordResetToken)
+
+	// Send email with reset link
+	emailSubject := "Password Reset Request"
+	emailBody := fmt.Sprintf(`
+			<h1>Password Reset</h1>
+			<p>You requested a password reset for your Trust account.</p>
+			<p>Click the link below to reset your password:</p>
+			<p><a href="%s">Reset Password</a></p>
+			<p>This link will expire in 1 hour.</p>
+			<p>If you didn't request a password reset, please ignore this email or contact support if you have concerns.</p>
+	`, resetURL)
+
+	if err := utils.SendEmail(user.Email, emailSubject, emailBody); err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to send reset email"))
+		return
+	}
+
+	// Return success response without revealing if email exists for security
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"message": "If an account with that email exists, password reset instructions have been sent",
+	})
+}
+
+func (h *GeneralHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+
 }

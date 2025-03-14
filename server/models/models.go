@@ -14,16 +14,15 @@ type Role struct {
 
 type User struct {
 	gorm.Model
-	FirstName             string     `json:"firstName" gorm:"type:varchar(100);"`
-	LastName              string     `json:"lastName" gorm:"type:varchar(100);"`
-	Email                 string     `json:"email" gorm:"type:varchar(100);not null;unique"`
-	Password              string     `json:"password" gorm:"type:text;not null"`
-	PhoneNumber           string     `json:"phoneNumber" gorm:"type:varchar(100)"`
-	Reputation            float64    `json:"reputation" gorm:"default:0"`
-	Roles                 []Role     `gorm:"many2many:user_roles;"`
-	Certificates          []Document `gorm:"polymorphic:Documentable;"`
-	AccountActivationHash string     `json:"accountActivationHash" gorm:"type:text"`
-	IsActive              bool       `json:"isActive" gorm:"default:false"`
+	FirstName    string     `json:"firstName" gorm:"type:varchar(100);"`
+	LastName     string     `json:"lastName" gorm:"type:varchar(100);"`
+	Email        string     `json:"email" gorm:"type:varchar(100);not null;unique"`
+	Password     string     `json:"password" gorm:"type:text;not null"`
+	PhoneNumber  string     `json:"phoneNumber" gorm:"type:varchar(100)"`
+	Reputation   float64    `json:"reputation" gorm:"default:0"`
+	Roles        []Role     `gorm:"many2many:user_roles;"`
+	Certificates []Document `gorm:"polymorphic:Documentable;"`
+	IsActive     bool       `json:"isActive" gorm:"default:false"`
 }
 
 type Bid struct {

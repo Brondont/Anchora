@@ -44,84 +44,85 @@ const LoginForm: React.FC<LoginFormContentProps> = ({
   handleSubmitLogin,
 }) => {
   return (
-    <Card
-      sx={{
-        width: "100%",
-        maxWidth: "400px",
-        p: 4,
-      }}
-    >
-      <CardContent>
-        <Box sx={{ mb: 2 }}>
-          <Link href="/" underline="none" sx={{ textDecoration: "none" }}>
-            <Typography variant="h4" color="primary" fontWeight="bold">
-              Trust
-            </Typography>
-          </Link>
-        </Box>
-        <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-          Log in
-        </Typography>
-        <form onSubmit={handleSubmitLogin}>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            <FormControl fullWidth>
-              <TextField
-                label="Email"
-                value={loginForm.email.value}
-                onChange={(event) =>
-                  inputChangeHandler(event.target.value, "email")
-                }
-                error={loginForm.email.error !== ""}
-                helperText={loginForm.email.error || ""}
-                sx={{
-                  ...(isShake && loginForm.email.error
-                    ? { animation: `${shakeAnimation} 0.35s` }
-                    : {}),
-                }}
-              />
-            </FormControl>
-            <FormControl fullWidth>
-              <TextField
-                type="password"
-                value={loginForm.password.value}
-                label="Password"
-                error={loginForm.password.error !== ""}
-                helperText={loginForm.password.error || ""}
-                onChange={(event) =>
-                  inputChangeHandler(event.target.value, "password")
-                }
-                sx={{
-                  ...(isShake && loginForm.password.error
-                    ? { animation: `${shakeAnimation} 0.35s` }
-                    : {}),
-                }}
-              />
-            </FormControl>
-            {generalError !== "" && (
-              <Typography
-                variant="body1"
-                color="error"
-                textAlign="center"
-                sx={{
-                  ...(isShake ? { animation: `${shakeAnimation} 0.35s` } : {}),
-                }}
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <Box>
+        <Link href="/" underline="none" sx={{ textDecoration: "none" }}>
+          <Typography variant="h4" color="primary" fontWeight="bold">
+            Trust
+          </Typography>
+        </Link>
+      </Box>
+      <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
+        Log in
+      </Typography>
+      <form onSubmit={handleSubmitLogin}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          <FormControl fullWidth>
+            <TextField
+              label="Email"
+              value={loginForm.email.value}
+              onChange={(event) =>
+                inputChangeHandler(event.target.value, "email")
+              }
+              error={loginForm.email.error !== ""}
+              helperText={loginForm.email.error || ""}
+              sx={{
+                ...(isShake && loginForm.email.error
+                  ? { animation: `${shakeAnimation} 0.35s` }
+                  : {}),
+              }}
+            />
+          </FormControl>
+          <FormControl fullWidth>
+            <TextField
+              type="password"
+              value={loginForm.password.value}
+              label="Password"
+              error={loginForm.password.error !== ""}
+              helperText={loginForm.password.error || ""}
+              onChange={(event) =>
+                inputChangeHandler(event.target.value, "password")
+              }
+              sx={{
+                ...(isShake && loginForm.password.error
+                  ? { animation: `${shakeAnimation} 0.35s` }
+                  : {}),
+              }}
+            />
+            <Typography sx={{ mt: 1 }}>
+              Forgot your password?{" "}
+              <Link
+                href="/forgot-password"
+                style={{ color: "#1976d2", textDecoration: "none" }}
               >
-                {generalError}
-              </Typography>
-            )}
-            <LoadingButton
-              loading={isSending}
-              variant="contained"
-              type="submit"
-              size="large"
-              sx={{ mt: 2, fontSize: "16px" }}
+                Reset it here!
+              </Link>
+            </Typography>
+          </FormControl>
+          {generalError !== "" && (
+            <Typography
+              variant="body1"
+              color="error"
+              textAlign="center"
+              sx={{
+                ...(isShake ? { animation: `${shakeAnimation} 0.35s` } : {}),
+              }}
             >
-              Login
-            </LoadingButton>
-          </Box>
-        </form>
-      </CardContent>
-    </Card>
+              {generalError}
+            </Typography>
+          )}
+          <LoadingButton
+            loading={isSending}
+            variant="contained"
+            type="submit"
+            size="large"
+            sx={{ mt: 2, fontSize: "16px" }}
+          >
+            Login
+          </LoadingButton>
+        </Box>
+      </form>
+    </Box>
   );
 };
 

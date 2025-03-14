@@ -263,12 +263,11 @@ func (h *AdminHandler) PostUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create verification token
-	verificationTokenHash, verificationToken, err := auth.CreateVerificationToken(user.Email)
+	verificationToken, err := auth.CreateVerificationToken(user.Email, user.Password)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
-	user.AccountActivationHash = verificationTokenHash
 
 	// Create the user
 	if err := tx.Create(&user).Error; err != nil {

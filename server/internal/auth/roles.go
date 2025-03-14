@@ -11,8 +11,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// ValidateToken parses and validates a JWT token, returning claims.
-func ValidateToken(r *http.Request) (jwt.MapClaims, error) {
+// ValidateAuthToken parses and validates an authentication JWT token, returning AuthClaims.
+// It ensures that the token is of type "auth" and that the user's account is active.
+func ValidateAuthToken(r *http.Request) (*AuthClaims, error) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		return nil, errors.New("authorization header missing")
@@ -22,12 +23,11 @@ func ValidateToken(r *http.Request) (jwt.MapClaims, error) {
 	if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
 		return nil, errors.New("invalid token format")
 	}
+	tokenString := tokenParts[1]
 
-	token := tokenParts[1]
-
-	// Parse and validate the token
-	parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
-		// Ensure the signing method matches
+	// Parse the token into AuthClaims
+	token, err := jwt.ParseWithClaims(tokenString, &AuthClaims{}, func(token *jwt.Token) (interface{}, error) {
+		// Ensure the signing method is HMAC
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
 		}
@@ -37,35 +37,39 @@ func ValidateToken(r *http.Request) (jwt.MapClaims, error) {
 		return nil, errors.New("invalid token: " + err.Error())
 	}
 
-	// Extract claims safely
-	if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok && parsedToken.Valid {
-		return claims, nil
+	claims, ok := token.Claims.(*AuthClaims)
+	if !ok || !token.Valid {
+		return nil, errors.New("unable to extract JWT claims")
 	}
 
-	return nil, errors.New("unable to extract JWT claims")
+	// Ensure token type is "auth"
+	if claims.TokenType != "auth" {
+		return nil, errors.New("invalid token type")
+	}
+
+	// Check if the user's account is active
+	if !claims.IsActive {
+		return nil, errors.New("account is not active")
+	}
+
+	return claims, nil
 }
 
-// HasRole checks if a user has the required role.
-func HasRole(claims jwt.MapClaims, requiredRole string) bool {
-	roles, ok := claims["roles"].([]interface{})
-	if !ok {
-		return false
-	}
-
-	for _, role := range roles {
-		if roleStr, ok := role.(string); ok {
-			if roleStr == "admin" || roleStr == requiredRole {
-				return true
-			}
+// HasRole checks if a user (represented by AuthClaims) has the required role.
+func HasRole(claims *AuthClaims, requiredRole string) bool {
+	for _, role := range claims.Roles {
+		if role == "admin" || role == requiredRole {
+			return true
 		}
 	}
 	return false
 }
 
-// RequireRole is a middleware that checks if the user has a required role.
+// RequireRole is a middleware that verifies the token, checks for the required role,
+// and ensures that the user's account is active.
 func RequireRole(requiredRole string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		claims, err := ValidateToken(r)
+		claims, err := ValidateAuthToken(r)
 		if err != nil {
 			utils.WriteError(w, http.StatusUnauthorized, err)
 			return
@@ -76,7 +80,8 @@ func RequireRole(requiredRole string, next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), "userID", claims["userID"])
+		// Set userID and claims in context for downstream handlers
+		ctx := context.WithValue(r.Context(), "userID", claims.UserID)
 		ctx = context.WithValue(ctx, "claims", claims)
 
 		next.ServeHTTP(w, r.WithContext(ctx))

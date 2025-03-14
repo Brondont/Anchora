@@ -19,7 +19,7 @@ import {
 import { useFeedback } from "../FeedbackAlertContext";
 import { ServerFormError } from "../types";
 
-const AccountActivationPage: React.FC = () => {
+const PasswordResetPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -64,7 +64,7 @@ const AccountActivationPage: React.FC = () => {
     const token = searchParams.get("token");
 
     try {
-      const res = await fetch(`${apiUrl}/user/activate`, {
+      const res = await fetch(`${apiUrl}/user/reset-password`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -115,42 +115,6 @@ const AccountActivationPage: React.FC = () => {
       );
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  // Handler to resend activation link if needed
-  const handleResendActivation = async () => {
-    const token = searchParams.get("token");
-
-    if (!token) {
-      showFeedback(
-        "Invalid token provided. Please contact support or ensure that you clicked the link in your email to get here.",
-        false
-      );
-      return;
-    }
-
-    try {
-      const res = await fetch(`${apiUrl}/user/resend-activation`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token }),
-      });
-
-      const resData = await res.json();
-
-      if (resData.error) {
-        throw resData.error;
-      }
-
-      showFeedback("Activation link has been resent to your email.", true);
-    } catch (err: any) {
-      showFeedback(
-        err.message || "Something went wrong. Please try again later.",
-        false
-      );
     }
   };
 
@@ -211,23 +175,8 @@ const AccountActivationPage: React.FC = () => {
           />
         </CardContent>
       </Card>
-      <Box sx={{ mt: 2 }}>
-        <Typography variant="body2" align="center">
-          Can't activate your account?{" "}
-          <span
-            style={{
-              cursor: "pointer",
-              color: "#1976d2",
-              textDecoration: "underline",
-            }}
-            onClick={handleResendActivation}
-          >
-            Resend activation link
-          </span>
-        </Typography>
-      </Box>
     </Box>
   );
 };
 
-export default AccountActivationPage;
+export default PasswordResetPage;

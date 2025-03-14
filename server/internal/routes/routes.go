@@ -17,6 +17,8 @@ func SetupRoutes(router *mux.Router) {
 	router.HandleFunc("/user/{userID}", generalHandler.GetUser).Methods("GET")
 	router.HandleFunc("/user-profile/{userID}", generalHandler.GetUserProfile).Methods("GET")
 	router.HandleFunc("/user/activate", generalHandler.ActivateUser).Methods("PUT")
+	router.HandleFunc("/user/forgot-password", generalHandler.ForgotPassword).Methods("POST")
+	router.HandleFunc("/user/reset-password", generalHandler.ResetPassword).Methods("PUT")
 	router.HandleFunc("/login", generalHandler.PostLogin).Methods("POST")
 
 	// User routes

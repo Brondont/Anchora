@@ -8,7 +8,17 @@ import {
   Button,
 } from "@mui/material";
 
-const ConfirmationDialog = ({
+interface ConfirmationDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmButtonText: string;
+  cancelButtonText: string;
+}
+
+const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   open,
   onClose,
   onConfirm,

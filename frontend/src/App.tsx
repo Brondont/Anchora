@@ -24,6 +24,8 @@ import { UserProps } from "./types";
 import ProfilePage from "./pages/user/ProfilePage";
 import AdminSpace from "./pages/admin/AdminSpace";
 import AccountActivationPage from "./pages/AccountActivationPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import PasswordResetPage from "./pages/PasswordResetPage";
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -149,6 +151,11 @@ const App: React.FC = () => {
             ) : (
               <Routes>
                 <Route path="/" element={<HomePage />} />
+                <Route
+                  path="/forgot-password"
+                  element={<ForgotPasswordPage />}
+                />
+                <Route path="/reset-password" element={<PasswordResetPage />} />
                 {!isAuth ? (
                   <>
                     <Route

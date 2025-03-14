@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { Box, Typography, Link } from "@mui/material";
+import { Box, Typography, Link, CardContent, Card } from "@mui/material";
 import LoginForm, { LoginFormProps } from "./LoginForm";
 import { useFeedback } from "../../FeedbackAlertContext";
 import { useNavigate } from "react-router-dom";
@@ -124,23 +124,26 @@ const LoginPage: React.FC<LoginPageProps> = ({ handleLogin }) => {
   return (
     <Box
       sx={{
-        height: "100vh",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        flexDirection: "column",
-        gap: 4,
+        minHeight: "100vh",
         p: 2,
       }}
     >
-      <LoginForm
-        loginForm={loginForm}
-        isShake={isShake}
-        isSending={isSending}
-        generalError={generalError}
-        inputChangeHandler={inputChangeHandler}
-        handleSubmitLogin={handleSubmitLogin}
-      />
+      <Card sx={{ maxWidth: 500, width: "100%" }}>
+        <CardContent>
+          <LoginForm
+            loginForm={loginForm}
+            isShake={isShake}
+            isSending={isSending}
+            generalError={generalError}
+            inputChangeHandler={inputChangeHandler}
+            handleSubmitLogin={handleSubmitLogin}
+          />
+        </CardContent>
+      </Card>
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
         <Typography>Learn how to partner with us</Typography>
         <Link href="/faq" color="primary" underline="hover">
