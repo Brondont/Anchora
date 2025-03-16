@@ -9,9 +9,6 @@ import {
   Stepper,
   Step,
   StepLabel,
-  styled,
-  stepConnectorClasses,
-  StepConnector,
 } from "@mui/material";
 import {
   CheckCircle as CheckCircleIcon,
@@ -211,7 +208,7 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
             {totalRequirements} requirements: ({completedCount}/
             {totalRequirements} completed)
           </Typography>
-          <Stepper orientation="vertical">
+          <Stepper orientation="vertical" connector={null}>
             {requirementResults.map((req, index) => (
               <Step key={index} completed={req.completed}>
                 <StepLabel

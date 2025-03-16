@@ -290,5 +290,88 @@ func (h *GeneralHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *GeneralHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
 
+	if err := utils.ParseJson(r, &payload); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("invalid request format"))
+		return
+	}
+
+	// Validate required fields
+	if payload.Token == "" {
+		err := middleware.InputValidationError{
+			Type:  "required",
+			Value: "",
+			Msg:   "Token is required, make sure you arrived at this page from the link in your email.",
+			Path:  "general",
+		}
+		utils.WriteInputValidationError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+
+	if payload.Password == "" {
+		err := middleware.InputValidationError{
+			Type:  "required",
+			Value: "",
+			Msg:   "New password is required",
+			Path:  "password",
+		}
+		utils.WriteInputValidationError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+
+	// Validate the password
+	passwordErrors := middleware.ValidatePassword(payload.Password)
+	if len(passwordErrors) > 0 {
+		utils.WriteJson(w, http.StatusBadRequest, middleware.ErrorResponse{
+			Error: passwordErrors,
+		})
+		return
+	}
+
+	// Parse the password token
+	claims, err := auth.ParsePasswordResetToken(payload.Token)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	// Find user by email from the token claims
+	var user models.User
+	if err := db.DB.DB.Where("email = ?", claims.Email).First(&user).Error; err != nil {
+		utils.WriteError(w, http.StatusNotFound, errors.New("user not found"))
+		return
+	}
+
+	// Verify that the user's current password matches the fingerprint in the token
+	// This invalidates the token if the password was changed after the token was issued
+	currentPasswordFingerprint := utils.HashSHA256(user.Password)[:8]
+	if currentPasswordFingerprint != claims.PasswordFingerprint {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("password has been changed since reset was requested"))
+		return
+	}
+
+	// Hash the new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(payload.Password), bcrypt.DefaultCost)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("error processing password"))
+		return
+	}
+
+	// Update user record with new password
+	user.Password = string(hashedPassword)
+
+	// Save changes to database
+	if err := db.DB.DB.Save(&user).Error; err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to update password"))
+		return
+	}
+
+	// Return success response
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"message": "Password has been successfully reset",
+	})
 }

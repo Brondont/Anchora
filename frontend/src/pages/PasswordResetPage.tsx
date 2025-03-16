@@ -101,7 +101,7 @@ const PasswordResetPage: React.FC = () => {
 
       // Redirect to login page after 3 seconds
       showFeedback(
-        "Your account has been successfully activated. You can now log in. Redirecting...",
+        "Your password has been successfully reset. You can now log in. Redirecting...",
         true
       );
       setTimeout(() => {
@@ -110,7 +110,7 @@ const PasswordResetPage: React.FC = () => {
     } catch (err: any) {
       showFeedback(
         err.msg ||
-          "Something went wrong with activating your account, try again later.",
+          "Something went wrong with resetting your password, try again later.",
         false
       );
     } finally {
@@ -132,7 +132,7 @@ const PasswordResetPage: React.FC = () => {
       >
         <CircularProgress />
         <Typography variant="body1" sx={{ mt: 2 }}>
-          Verifying your account...
+          Verifying your reset token...
         </Typography>
       </Box>
     );
@@ -157,11 +157,11 @@ const PasswordResetPage: React.FC = () => {
             fontWeight="bold"
             sx={{ mb: 1 }}
           >
-            Activate Your Account
+            Reset Your Password
           </Typography>
 
           <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-            Please create a password to activate your account.
+            Please enter your new password.
           </Typography>
 
           <PasswordResetForm
@@ -170,7 +170,7 @@ const PasswordResetPage: React.FC = () => {
             generalError={generalError}
             onSubmit={handleSubmit}
             isSubmitting={isSubmitting}
-            submitButtonText="Activate Account"
+            submitButtonText="Reset Password"
             isShake={isShake}
           />
         </CardContent>
