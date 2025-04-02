@@ -18,12 +18,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	maxFileSize          = 10 << 20 // 10MB
-	modelUploadDirectory = "/public/models"
-	uploadDirectory      = "/public/images"
-)
-
 type AdminHandler struct {
 	*Handler
 }
@@ -142,64 +136,132 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) PutUser(w http.ResponseWriter, r *http.Request) {
-	// Extract user ID from the context
-	userID, ok := r.Context().Value("userID").(int)
-	if !ok {
-		utils.WriteError(w, http.StatusUnauthorized, errors.New("user id is missing in the token"))
-		return
-	}
-
-	// Extract isAdmin flag from the context
-	isAdmin, ok := r.Context().Value("isAdmin").(bool)
-	if !ok {
-		utils.WriteError(w, http.StatusUnauthorized, errors.New("admin status is missing in the token"))
-		return
-	}
-
 	// Parse the incoming JSON payload
-	var payload models.User
+	var payload struct {
+		FirstName   string   `json:"firstName"`
+		LastName    string   `json:"lastName"`
+		Email       string   `json:"email"`
+		PhoneNumber string   `json:"phoneNumber"`
+		RolesIDs    []string `json:"rolesIDs"`
+	}
 	err := utils.ParseJson(r, &payload)
 	if err != nil {
 		utils.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
 
+	// Start a database transaction
+	tx := db.DB.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Determine the user ID to update
+	vars := mux.Vars(r)
+	userID := vars["userID"]
+	if userID == "" {
+		tx.Rollback()
+		utils.WriteError(w, http.StatusBadRequest, errors.New("invalid user ID"))
+		return
+	}
+
 	// Fetch the existing user from the database
 	var existingUser models.User
-	result := db.DB.DB.Where("email = ? OR phone_number = ?", payload.Email, payload.PhoneNumber).First(&existingUser)
-	if result.Error != nil {
+	if result := tx.Preload("Roles").First(&existingUser, userID); result.Error != nil {
+		tx.Rollback()
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			utils.WriteError(w, http.StatusNotFound, errors.New("user not found"))
 			return
 		}
-		utils.WriteError(w, http.StatusInternalServerError, errors.New("something went wrong with fetching the user, try again"))
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("error fetching user"))
 		return
 	}
 
-	// If the user is not an admin, ensure they can only edit their own account
-	if !isAdmin && existingUser.ID != uint(userID) {
-		utils.WriteError(w, http.StatusForbidden, errors.New("you do not have permission to edit this user"))
+	// Validate input
+	updatedUser := models.User{
+		FirstName:   payload.FirstName,
+		LastName:    payload.LastName,
+		Email:       payload.Email,
+		PhoneNumber: payload.PhoneNumber,
+	}
+	inputErrors := middleware.ValidateUserInput(updatedUser)
+	if len(inputErrors) > 0 {
+		tx.Rollback()
+		utils.WriteInputValidationError(w, http.StatusUnprocessableEntity, inputErrors)
 		return
 	}
 
-	// Update the user's information
-	existingUser.Email = payload.Email
+	// Check if email is already in use by another user
+	var emailCheckUser models.User
+	if result := tx.Where("email = ? AND id != ?", payload.Email, userID).First(&emailCheckUser); result.Error == nil {
+		tx.Rollback()
+		err := middleware.InputValidationError{
+			Type:  "invalid",
+			Value: payload.Email,
+			Msg:   "An account with this E-mail already exists",
+			Path:  "email",
+		}
+		utils.WriteInputValidationError(w, http.StatusConflict, err)
+		return
+	}
+
+	// Update user fields
 	existingUser.FirstName = payload.FirstName
 	existingUser.LastName = payload.LastName
+	existingUser.Email = payload.Email
 	existingUser.PhoneNumber = payload.PhoneNumber
-	// Add other fields you want to update
 
-	// Save the updated user information
-	updateResult := db.DB.DB.Save(&existingUser)
-	if updateResult.Error != nil {
-		utils.WriteError(w, http.StatusInternalServerError, errors.New("something went wrong with updating the user, try again"))
+	// Handle roles update
+	if len(payload.RolesIDs) > 0 {
+		// Clear existing roles
+		if err := tx.Model(&existingUser).Association("Roles").Clear(); err != nil {
+			tx.Rollback()
+			utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to clear existing roles"))
+			return
+		}
+
+		// Assign new roles
+		for _, roleIDStr := range payload.RolesIDs {
+			var dbRole models.Role
+			if err := tx.Where("id = ?", roleIDStr).First(&dbRole).Error; err != nil {
+				tx.Rollback()
+				utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("role with ID %s not found", roleIDStr))
+				return
+			}
+			if err := tx.Model(&existingUser).Association("Roles").Append(&dbRole); err != nil {
+				tx.Rollback()
+				utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to assign roles"))
+				return
+			}
+		}
+	}
+
+	// Save the updated user
+	if err := tx.Save(&existingUser).Error; err != nil {
+		tx.Rollback()
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to update user"))
+		return
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Fetch the complete user with roles for response
+	var completeUser models.User
+	if err := db.DB.DB.Preload("Roles").First(&completeUser, existingUser.ID).Error; err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	// Respond with the updated user information
 	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
 		"message": "User updated successfully",
-		"user":    existingUser,
+		"user":    completeUser,
 	})
 }
 

@@ -1,4 +1,4 @@
-@startuml class
+@startuml
 left to right direction
 skinparam linetype ortho
 skinparam ArrowFontSize 10
@@ -151,4 +151,23 @@ class OfferContract {
 User <|-- Admin
 User <|-- Entrepreneur
 User <|-- TenderAdministrator
-User 
+User <|-- Expert
+
+' -- Associations between User and Role --
+User "*" -- "*" Role
+
+' -- Associations for Tender and Voting Process --
+TenderAdministrator "1" -- "*" Offer : creates
+Entrepreneur "1" -- "*" Proposal : submits
+Offer "1" -- "*" Proposal : receives
+Expert "1" -- "*" BlockchainVote : casts
+Proposal "1" -- "*" BlockchainVote : evaluatedBy
+
+Offer "1" -- "1" OfferContract : finalizes
+
+Offer "*" -- "*" OfferRules
+Document "*" -- "1" Offer : attachedTo
+Document "*" -- "1" Proposal : attachedTo
+Document "*" -- "1" User : uploadedBy
+
+@enduml

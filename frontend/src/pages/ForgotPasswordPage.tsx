@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useCallback, useState } from "react";
+import React, { ChangeEvent, useCallback, useEffect, useState } from "react";
 import { LoadingButton } from "@mui/lab";
 import {
   Box,
@@ -10,7 +10,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useFeedback } from "../FeedbackAlertContext";
 import { isEmail, ValidatorFunction } from "../util/validators";
 
@@ -38,12 +38,12 @@ const ForgotPasswordPage = () => {
       error: "",
     },
   });
+  const [searchParams] = useSearchParams();
   const [isShake, setIsShake] = useState<boolean>(false);
   const [isSending, setIsSending] = useState<boolean>(false);
   const [generalError, setGeneralError] = useState<string>("");
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
-  const navigate = useNavigate();
   const { showFeedback } = useFeedback();
 
   const apiUrl = import.meta.env.VITE_API_URL;
@@ -140,6 +140,18 @@ const ForgotPasswordPage = () => {
       setIsSending(false);
     }
   };
+
+  useEffect(() => {
+    const urlEmail = searchParams.get("email");
+    if (!urlEmail) return;
+
+    setEmailForm({
+      email: {
+        ...emailForm.email,
+        value: urlEmail,
+      },
+    });
+  }, [searchParams]);
 
   return (
     <Box

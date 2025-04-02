@@ -16,12 +16,12 @@ import { AuthContext } from "./authContext";
 
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/auth/LoginPage";
-import LoadingPage from "./pages/user/LoadingPage";
-import UserSpace from "./pages/user/UserSpace";
+import LoadingPage from "./pages/entrepreneur/LoadingPage";
+import EntrepreneurSpace from "./pages/entrepreneur/EntrepreneurSpace";
 import { lightTheme, darkTheme } from "./theme";
 import Navbar from "./components/navbar/Navbar";
 import { UserProps } from "./types";
-import ProfilePage from "./pages/user/ProfilePage";
+import ProfilePage from "./pages/entrepreneur/ProfilePage";
 import AdminSpace from "./pages/admin/AdminSpace";
 import AccountActivationPage from "./pages/AccountActivationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -89,6 +89,10 @@ const App: React.FC = () => {
     },
     [apiUrl]
   );
+
+  const handleUpdateUser = (newUser: UserProps) => {
+    setUser(newUser);
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -176,7 +180,11 @@ const App: React.FC = () => {
                     <Route
                       path="/account/*"
                       element={
-                        <UserSpace user={user} handleLogout={handleLogout} />
+                        <EntrepreneurSpace
+                          user={user}
+                          handleUpdateUser={handleUpdateUser}
+                          handleLogout={handleLogout}
+                        />
                       }
                     />
                     <Route

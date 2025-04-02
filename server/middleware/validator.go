@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net/mail"
 	"regexp"
 
 	"github.com/Brondont/trust-api/models"
@@ -17,12 +18,24 @@ type ErrorResponse struct {
 	Error []InputValidationError `json:"error"`
 }
 
+// IsValidEmail checks if an email address is valid.
+func IsValidEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
+
+// IsValidPhoneNumber checks if a phone number matches a basic pattern.
+func IsValidPhoneNumber(phone string) bool {
+	re := regexp.MustCompile(`^\+?[1-9]\d{1,14}$`) // Supports international format
+	return re.MatchString(phone)
+}
+
 // ValidateUserInput: Validates user sign up infromation
 func ValidateUserInput(payload models.User) []InputValidationError {
 	var errors []InputValidationError
 
 	// Validate email
-	if !isValidEmail(payload.Email) {
+	if !IsValidEmail(payload.Email) {
 		errors = append(errors, InputValidationError{
 			Type:  "invalid",
 			Value: payload.Email,
@@ -51,12 +64,6 @@ func ValidateUserInput(payload models.User) []InputValidationError {
 	}
 
 	return errors
-}
-
-// Helper functions remain the same
-func isValidEmail(email string) bool {
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-	return emailRegex.MatchString(email)
 }
 
 func ValidatePassword(password string) []InputValidationError {

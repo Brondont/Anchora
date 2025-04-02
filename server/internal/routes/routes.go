@@ -12,28 +12,30 @@ import (
 func SetupRoutes(router *mux.Router) {
 	adminHandler := handlers.NewAdminHandler()
 	generalHandler := handlers.NewGeneralHandler()
+	userHandler := handlers.NewUserHandler()
 
-	// General Routes
-	router.HandleFunc("/user/{userID}", generalHandler.GetUser).Methods("GET")
+	// General Routes (accessible without role restrictions)
 	router.HandleFunc("/user-profile/{userID}", generalHandler.GetUserProfile).Methods("GET")
 	router.HandleFunc("/user/activate", generalHandler.ActivateUser).Methods("PUT")
 	router.HandleFunc("/user/forgot-password", generalHandler.ForgotPassword).Methods("POST")
 	router.HandleFunc("/user/reset-password", generalHandler.ResetPassword).Methods("PUT")
 	router.HandleFunc("/login", generalHandler.PostLogin).Methods("POST")
 
-	// User routes
-	router.HandleFunc("/user", auth.RequireRole("user", adminHandler.PutUser)).Methods("PUT")
-	router.HandleFunc("/user", auth.RequireRole("admin", adminHandler.PostUser)).Methods("POST")
+	// User routes that require authentication
+	router.HandleFunc("/user/{userID}", auth.RequireRole(userHandler.GetUser)).Methods("GET")
+	router.HandleFunc("/user/email", auth.RequireRole(userHandler.UpdateEmail)).Methods("PUT")
+	router.HandleFunc("/user/phone-number", auth.RequireRole(userHandler.UpdatePhoneNumber)).Methods("PUT")
 
-	// Admin Routes
-	router.HandleFunc("/users", auth.RequireRole("admin", adminHandler.GetUsers)).Methods("GET")
-	router.HandleFunc("/users/{userID}", auth.RequireRole("admin", adminHandler.DeleteUser)).Methods("DELETE")
+	// Admin Routes (require "admin" role)
+	router.HandleFunc("/user/{userID}", auth.RequireRole(adminHandler.PutUser, "admin")).Methods("PUT")
+	router.HandleFunc("/user", auth.RequireRole(adminHandler.PostUser, "admin")).Methods("POST")
+	router.HandleFunc("/users", auth.RequireRole(adminHandler.GetUsers, "admin")).Methods("GET")
+	router.HandleFunc("/users/{userID}", auth.RequireRole(adminHandler.DeleteUser, "admin")).Methods("DELETE")
 
-	router.HandleFunc("/roles", auth.RequireRole("admin", adminHandler.GetRoles)).Methods("GET")
-	router.HandleFunc("/roles", auth.RequireRole("admin", adminHandler.CreateRole)).Methods("POST")
-	router.HandleFunc("/roles/{roleName}", auth.RequireRole("admin", adminHandler.UpdateRole)).Methods("PUT")
-	router.HandleFunc("/roles/{roleName}", auth.RequireRole("admin", adminHandler.DeleteRole)).Methods("DELETE")
-
+	router.HandleFunc("/roles", auth.RequireRole(adminHandler.GetRoles, "admin")).Methods("GET")
+	router.HandleFunc("/roles", auth.RequireRole(adminHandler.CreateRole, "admin")).Methods("POST")
+	router.HandleFunc("/roles/{roleName}", auth.RequireRole(adminHandler.UpdateRole, "admin")).Methods("PUT")
+	router.HandleFunc("/roles/{roleName}", auth.RequireRole(adminHandler.DeleteRole, "admin")).Methods("DELETE")
 }
 
 func SetupStaticRoutes(router *mux.Router) {

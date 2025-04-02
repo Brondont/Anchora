@@ -73,7 +73,6 @@ const AdminUserForm: React.FC = () => {
   const [isShake, setIsShake] = useState<boolean>(false);
   const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
 
-  const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_API_URL;
   const token = localStorage.getItem("token");
   const { showFeedback } = useFeedback();
@@ -352,7 +351,6 @@ const AdminUserForm: React.FC = () => {
         true
       );
     } catch (err: any) {
-      console.log(err);
       showFeedback(
         err.msg || `Failed to ${paramUserID ? "update" : "create"} user`,
         false

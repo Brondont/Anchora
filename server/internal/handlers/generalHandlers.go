@@ -13,7 +13,6 @@ import (
 	"github.com/Brondont/trust-api/utils"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
 type GeneralHandler struct {
@@ -24,51 +23,6 @@ func NewGeneralHandler() *GeneralHandler {
 	return &GeneralHandler{
 		Handler: NewHandler(),
 	}
-}
-
-// GetUser retrieves user information from the database.
-func (h *GeneralHandler) GetUser(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userID := vars["userID"]
-
-	if userID == "" {
-		utils.WriteError(w, http.StatusBadRequest, errors.New("no user id provided"))
-		return
-	}
-
-	// Validate the JWT token using the new typed validation function
-	claims, err := auth.ValidateAuthToken(r)
-	if err != nil {
-		utils.WriteError(w, http.StatusUnauthorized, err)
-		return
-	}
-
-	// Check if the caller is an admin or is the same user.
-	// Note: We allow access if the user is an admin OR the token's userID equals the requested userID.
-	if !auth.HasRole(claims, "admin") && claims.UserID != userID {
-		utils.WriteError(w, http.StatusForbidden, errors.New("insufficient permissions"))
-		return
-	}
-
-	// Fetch user from database
-	var user models.User
-	result := db.DB.DB.Preload("Roles").
-		Select("id", "email", "first_name", "last_name", "phone_number").
-		Where("id = ?", userID).
-		First(&user)
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			utils.WriteError(w, http.StatusNotFound, errors.New("user not found"))
-			return
-		}
-		utils.WriteError(w, http.StatusInternalServerError, errors.New("something went wrong with getting the user, try again"))
-		return
-	}
-
-	// Respond with user data
-	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
-		"user": user,
-	})
 }
 
 // PostLogin handles user login.
@@ -374,4 +328,8 @@ func (h *GeneralHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
 		"message": "Password has been successfully reset",
 	})
+}
+
+func (h *GeneralHandler) UpdateUserEmail(w http.ResponseWriter, r *http.Request) {
+
 }

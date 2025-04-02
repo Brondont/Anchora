@@ -55,19 +55,31 @@ func ValidateAuthToken(r *http.Request) (*AuthClaims, error) {
 	return claims, nil
 }
 
-// HasRole checks if a user (represented by AuthClaims) has the required role.
-func HasRole(claims *AuthClaims, requiredRole string) bool {
-	for _, role := range claims.Roles {
-		if role == "admin" || role == requiredRole {
+// HasRole checks if a user (represented by AuthClaims) has any of the required roles.
+// If no roles are specified (len(requiredRoles) == 0), it returns true, allowing access.
+func HasRole(claims *AuthClaims, requiredRoles []string) bool {
+	// No specific role required – allow any authenticated user.
+	if len(requiredRoles) == 0 {
+		return true
+	}
+
+	for _, userRole := range claims.Roles {
+		// The "admin" role has override access.
+		if userRole == "admin" {
 			return true
+		}
+		for _, requiredRole := range requiredRoles {
+			if userRole == requiredRole {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-// RequireRole is a middleware that verifies the token, checks for the required role,
-// and ensures that the user's account is active.
-func RequireRole(requiredRole string, next http.HandlerFunc) http.HandlerFunc {
+// RequireRole is a middleware that verifies the token and checks that the user has at least one
+// of the required roles. If no roles are provided, any authenticated user is allowed.
+func RequireRole(next http.HandlerFunc, requiredRoles ...string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, err := ValidateAuthToken(r)
 		if err != nil {
@@ -75,7 +87,7 @@ func RequireRole(requiredRole string, next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if !HasRole(claims, requiredRole) {
+		if !HasRole(claims, requiredRoles) {
 			utils.WriteError(w, http.StatusForbidden, errors.New("insufficient permissions"))
 			return
 		}
