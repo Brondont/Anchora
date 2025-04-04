@@ -12,6 +12,7 @@ export interface UserProps {
   email: string;
   phoneNumber: string;
   Roles: Role[];
+  publicWalletAddress: string | undefined;
 }
 
 export interface ErrorResponse {

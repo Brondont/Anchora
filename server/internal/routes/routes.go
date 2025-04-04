@@ -25,6 +25,7 @@ func SetupRoutes(router *mux.Router) {
 	router.HandleFunc("/user/{userID}", auth.RequireRole(userHandler.GetUser)).Methods("GET")
 	router.HandleFunc("/user/email", auth.RequireRole(userHandler.UpdateEmail)).Methods("PUT")
 	router.HandleFunc("/user/phone-number", auth.RequireRole(userHandler.UpdatePhoneNumber)).Methods("PUT")
+	router.HandleFunc("/user/wallet", auth.RequireRole(userHandler.UpdateWallet)).Methods("PUT")
 
 	// Admin Routes (require "admin" role)
 	router.HandleFunc("/user/{userID}", auth.RequireRole(adminHandler.PutUser, "admin")).Methods("PUT")

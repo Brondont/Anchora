@@ -81,9 +81,10 @@ func (h *GeneralHandler) PostLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.WriteJson(w, http.StatusCreated, map[string]interface{}{
-		"message": "User validated",
-		"token":   token,
-		"userID":  user.ID,
+		"message":             "User validated",
+		"token":               token,
+		"publicWalletAddress": user.PublicWalletAddress,
+		"userID":              user.ID,
 	})
 }
 

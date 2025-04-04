@@ -10,18 +10,18 @@ import {
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 
-import { FeedbackProvider } from "./FeedbackAlertContext";
+import { useFeedback } from "./FeedbackAlertContext";
 import FeedbackAlert from "./components/feedbackAlert/FeedbackAlert";
 import { AuthContext } from "./authContext";
 
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/auth/LoginPage";
-import LoadingPage from "./pages/entrepreneur/LoadingPage";
-import EntrepreneurSpace from "./pages/entrepreneur/EntrepreneurSpace";
+import LoadingPage from "./pages/LoadingPage";
+import UserSpace from "./pages/user/UserSpace";
 import { lightTheme, darkTheme } from "./theme";
 import Navbar from "./components/navbar/Navbar";
 import { UserProps } from "./types";
-import ProfilePage from "./pages/entrepreneur/ProfilePage";
+import ProfilePage from "./pages/user/ProfilePage";
 import AdminSpace from "./pages/admin/AdminSpace";
 import AccountActivationPage from "./pages/AccountActivationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -39,10 +39,12 @@ const App: React.FC = () => {
     firstName: "",
     lastName: "",
     Roles: [],
+    publicWalletAddress: "",
   });
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { showFeedback } = useFeedback();
 
   const apiUrl = import.meta.env.VITE_API_URL;
 
@@ -57,6 +59,7 @@ const App: React.FC = () => {
     setIsAuth(false);
     localStorage.removeItem("token");
     localStorage.removeItem("userID");
+    localStorage.removeItem("publicWalletAddress");
     localStorage.removeItem("expiryDate");
     navigate("/");
   };
@@ -80,8 +83,16 @@ const App: React.FC = () => {
         if (resData.error) throw resData.error;
 
         setUser(resData.user);
+        localStorage.setItem(
+          "publicWalletAddress",
+          resData.user.publicWalletAddress
+        );
         setIsAuth(true);
       } catch (err) {
+        showFeedback(
+          "An error occurred while validating your account. You have been signed out for security reasons.",
+          false
+        );
         handleLogout();
       } finally {
         setIsLoading(false);
@@ -135,73 +146,68 @@ const App: React.FC = () => {
   );
 
   return (
-    <FeedbackProvider>
-      <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
-        <CssBaseline enableColorScheme />
-        <AuthContext.Provider value={{ handleLogout, toggleDarkMode }}>
-          {shouldRenderNavbar && (
-            <Navbar
-              user={user}
-              toggleDarkMode={toggleDarkMode}
-              isDarkMode={isDarkMode}
-              handleLogout={handleLogout}
-              isAuth={isAuth}
-            />
+    <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
+      <CssBaseline enableColorScheme />
+      <AuthContext.Provider value={{ handleLogout, toggleDarkMode }}>
+        {shouldRenderNavbar && (
+          <Navbar
+            user={user}
+            toggleDarkMode={toggleDarkMode}
+            isDarkMode={isDarkMode}
+            handleLogout={handleLogout}
+            isAuth={isAuth}
+          />
+        )}
+        <Box sx={{ position: "relative", width: "100%", minHeight: "80vh" }}>
+          <FeedbackAlert />
+          {isLoading ? (
+            <LoadingPage />
+          ) : (
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<PasswordResetPage />} />
+              {!isAuth ? (
+                <>
+                  <Route
+                    path="/login"
+                    element={<LoginPage handleLogin={handleLogin} />}
+                  />
+                  <Route
+                    path="/activation"
+                    element={<AccountActivationPage />}
+                  />
+                </>
+              ) : (
+                <>
+                  <Route
+                    path="/profile/:userID"
+                    element={<ProfilePage activeUser={user} />}
+                  />
+                  <Route
+                    path="/account/*"
+                    element={
+                      <UserSpace
+                        user={user}
+                        handleUpdateUser={handleUpdateUser}
+                        handleLogout={handleLogout}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/admin/*"
+                    element={
+                      <AdminSpace user={user} handleLogout={handleLogout} />
+                    }
+                  />
+                </>
+              )}
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
           )}
-          <Box sx={{ position: "relative", width: "100%", minHeight: "80vh" }}>
-            <FeedbackAlert />
-            {isLoading ? (
-              <LoadingPage />
-            ) : (
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route
-                  path="/forgot-password"
-                  element={<ForgotPasswordPage />}
-                />
-                <Route path="/reset-password" element={<PasswordResetPage />} />
-                {!isAuth ? (
-                  <>
-                    <Route
-                      path="/login"
-                      element={<LoginPage handleLogin={handleLogin} />}
-                    />
-                    <Route
-                      path="/activation"
-                      element={<AccountActivationPage />}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <Route
-                      path="/profile/:userID"
-                      element={<ProfilePage activeUser={user} />}
-                    />
-                    <Route
-                      path="/account/*"
-                      element={
-                        <EntrepreneurSpace
-                          user={user}
-                          handleUpdateUser={handleUpdateUser}
-                          handleLogout={handleLogout}
-                        />
-                      }
-                    />
-                    <Route
-                      path="/admin/*"
-                      element={
-                        <AdminSpace user={user} handleLogout={handleLogout} />
-                      }
-                    />
-                  </>
-                )}
-                <Route path="*" element={<Navigate to="/" />} />
-              </Routes>
-            )}
-          </Box>
-        </AuthContext.Provider>
-      </ThemeProvider>
-    </FeedbackProvider>
+        </Box>
+      </AuthContext.Provider>
+    </ThemeProvider>
   );
 };
 

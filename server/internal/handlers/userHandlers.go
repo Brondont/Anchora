@@ -10,6 +10,7 @@ import (
 	"github.com/Brondont/trust-api/middleware"
 	"github.com/Brondont/trust-api/models"
 	"github.com/Brondont/trust-api/utils"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
@@ -57,7 +58,7 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	// Fetch user from database
 	var user models.User
 	result := db.DB.DB.Preload("Roles").
-		Select("id", "email", "first_name", "last_name", "phone_number").
+		Select("id", "email", "first_name", "last_name", "phone_number", "public_wallet_address").
 		Where("id = ?", userID).
 		First(&user)
 	if result.Error != nil {
@@ -127,7 +128,7 @@ func (h *UserHandler) UpdateEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.WriteJson(w, http.StatusOK, map[string]string{"message": "Email updated successfully"})
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{"message": "Email updated successfully"})
 }
 
 // UpdatePhoneNumber updates the phone number of the authenticated user.
@@ -157,5 +158,56 @@ func (h *UserHandler) UpdatePhoneNumber(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	utils.WriteJson(w, http.StatusOK, map[string]string{"message": "Phone number updated successfully"})
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{"message": "Phone number updated successfully"})
+}
+
+func (h *UserHandler) UpdateWallet(w http.ResponseWriter, r *http.Request) {
+	claims, ok := r.Context().Value("claims").(*auth.AuthClaims)
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, errors.New("unable to retrieve authentication claims"))
+		return
+	}
+
+	var payload struct {
+		PublicWalletAddress string `json:"publicWalletAddress"`
+	}
+
+	if err := utils.ParseJson(r, &payload); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("invalid request format"))
+		return
+	}
+
+	payload.PublicWalletAddress = strings.TrimSpace(payload.PublicWalletAddress)
+
+	if payload.PublicWalletAddress == "" {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("wallet address cannot be empty"))
+		return
+	}
+
+	// Validate Ethereum wallet address format using go-ethereum common package.
+	if !common.IsHexAddress(payload.PublicWalletAddress) {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("invalid Ethereum wallet address"))
+		return
+	}
+
+	// Check if the user already has a wallet
+	var existingUser models.User
+	if err := db.DB.DB.Where("id = ?", claims.UserID).First(&existingUser).Error; err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("something went wrong while fetching user data"))
+		return
+	}
+
+	if existingUser.PublicWalletAddress != "" {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("this user already has a wallet associated with the account"))
+		return
+	}
+
+	existingUser.PublicWalletAddress = payload.PublicWalletAddress
+
+	if err := db.DB.DB.Save(&existingUser).Error; err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to update wallet address"))
+		return
+	}
+
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{"message": "wallet address updated successfully"})
 }

@@ -101,12 +101,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ handleLogin }) => {
           shakeFields();
           return;
         }
-        throw new Error(resData.error || "An error occurred");
+        throw resData.error;
       }
 
       localStorage.setItem("token", resData.token);
       const expiryDate = new Date(new Date().getTime() + 60 * 60 * 12 * 1000);
       localStorage.setItem("expiryDate", expiryDate.toISOString());
+      localStorage.setItem("publicWalletAddress", resData.publicWalletAddress);
       localStorage.setItem("userID", resData.userID);
 
       showFeedback("You are logged in! Redirecting to your dashboard...", true);

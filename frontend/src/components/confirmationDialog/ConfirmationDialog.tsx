@@ -1,4 +1,4 @@
-import React from "react";
+import React, { ReactNode } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -13,9 +13,11 @@ interface ConfirmationDialogProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  message: string;
+  message?: string;
+  children?: ReactNode;
   confirmButtonText: string;
-  cancelButtonText: string;
+  cancelButtonText?: string;
+  maxWidth?: string | number;
 }
 
 const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
@@ -23,9 +25,11 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   onClose,
   onConfirm,
   title = "Confirm Action",
-  message = "Are you sure you want to perform this action?",
+  message,
+  children,
   confirmButtonText = "Confirm",
-  cancelButtonText = "Cancel",
+  cancelButtonText,
+  maxWidth = 400,
 }) => {
   return (
     <Dialog
@@ -35,23 +39,26 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         sx: {
           borderRadius: 3,
           width: "100%",
-          maxWidth: 400,
+          maxWidth,
         },
       }}
     >
       <DialogTitle sx={{ pb: 1 }}>{title}</DialogTitle>
       <DialogContent>
-        <Typography>{message}</Typography>
+        {message && <Typography sx={{ mb: 2 }}>{message}</Typography>}
+        {children}
       </DialogContent>
       <DialogActions sx={{ p: 3, pt: 2 }}>
-        <Button
-          variant="outlined"
-          color="error"
-          onClick={onClose}
-          sx={{ borderRadius: 2, textTransform: "none" }}
-        >
-          {cancelButtonText}
-        </Button>
+        {cancelButtonText && (
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={onClose}
+            sx={{ borderRadius: 2, textTransform: "none" }}
+          >
+            {cancelButtonText}
+          </Button>
+        )}
         <Button
           onClick={onConfirm}
           color="primary"
