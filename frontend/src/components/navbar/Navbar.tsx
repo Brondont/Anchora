@@ -15,7 +15,6 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
-  Badge,
   useMediaQuery,
   ListItemButton,
   Menu,
@@ -39,6 +38,7 @@ import { styled } from "@mui/material/styles";
 import { UserProps } from "../../types";
 import { useNavigate } from "react-router-dom";
 import { Logout } from "@mui/icons-material";
+import { getEthBalance } from "../../util/ethereum";
 
 // Keep your existing MaterialUISwitch styled component...
 const MaterialUISwitch = styled(Switch)(({ theme }) => ({
@@ -133,6 +133,8 @@ const Navbar: React.FC<NavbarProps> = ({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const navigate = useNavigate();
+  const [ethBalance, setEthBalance] = useState<string>("0.0");
+  const publicWalletAddress = localStorage.getItem("publicWalletAddress");
 
   const handleClickUserSettings = (
     event: React.MouseEvent<HTMLButtonElement>
@@ -143,7 +145,26 @@ const Navbar: React.FC<NavbarProps> = ({
     setAnchorEl(null);
   };
 
+  // for updating the icon fo log in after the user logs in
   useEffect(() => {}, [isAuth]);
+
+  // for fetching the balance
+  useEffect(() => {
+    const fetchEthBalance = async () => {
+      if (isAuth && publicWalletAddress) {
+        try {
+          const balance = await getEthBalance(publicWalletAddress);
+          setEthBalance(balance);
+        } catch (error) {
+          console.error("Error fetching ETH balance:", error);
+          setEthBalance("0.00");
+        }
+      }
+    };
+
+    fetchEthBalance();
+    // Re-fetch when user changes or auth status changes
+  }, [isAuth, publicWalletAddress]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -353,10 +374,13 @@ const Navbar: React.FC<NavbarProps> = ({
             <Box
               sx={{
                 display: "flex",
+                justifyContent: "center",
                 alignItems: "center",
-                textAlign: "center",
               }}
             >
+              <Button href="/transactions" variant="text">
+                {ethBalance} ETH
+              </Button>
               <Tooltip title="Account settings">
                 <IconButton
                   onClick={handleClickUserSettings}

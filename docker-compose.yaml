@@ -2,6 +2,7 @@ version: "3.8"
 
 volumes:
   postgres_data:
+  hardhat_data:
 
 networks:
   trust:
@@ -20,7 +21,6 @@ services:
       - trust
     env_file:
       - ./frontend/.env
-
   trust-api:
     build:
       context: ./server
@@ -35,7 +35,6 @@ services:
       - db
     env_file:
       - ./server/.env
-
   db:
     image: postgres:15-alpine
     ports:
@@ -51,7 +50,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
   pgadmin:
     image: dpage/pgadmin4
     ports:
@@ -62,3 +60,15 @@ services:
       - db
     env_file:
       - ./server/.env
+  hardhat:
+    build:
+      context: ./hardhat
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./hardhat:/usr/src/app
+      - hardhat_data:/usr/src/app/data
+    networks:
+      - trust
+    env_file:
+      - ./hardhat/.env

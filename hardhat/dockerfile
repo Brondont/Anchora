@@ -1,0 +1,16 @@
+FROM node:18-alpine
+# Set the working directory in the container
+WORKDIR /usr/src/app
+
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy the rest of the project files into the container
+COPY . .
+
+# Expose Hardhat's default RPC port
+EXPOSE 8545
+
+# Start Hardhat's local node when the container runs
+CMD ["npx", "hardhat", "node"]

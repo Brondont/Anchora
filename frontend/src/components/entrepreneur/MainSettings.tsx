@@ -39,7 +39,7 @@ import { UserProps } from "../../types";
 import { useFeedback } from "../../FeedbackAlertContext";
 import { isEmail, isRequired, ValidatorFunction } from "../../util/validators";
 import { matchIsValidTel, MuiTelInput } from "mui-tel-input";
-import generateWallet, { WalletInfo } from "../../util/generateWallet";
+import { generateWallet, WalletInfo } from "../../util/ethereum";
 import ConfirmationDialog from "../confirmationDialog/ConfirmationDialog";
 
 export type EditFormProps = {
@@ -938,32 +938,35 @@ const MainSettings: React.FC<MainSettingsProps> = ({
                               alignItems: "center",
                             }}
                           >
-                            <Typography
-                              component="span"
-                              variant="body2"
-                              fontFamily="monospace"
-                              sx={{
-                                wordBreak: "break-all",
-                                bgcolor: theme.palette.background.paper,
-                                p: 1.5,
-                                borderRadius: 1,
-                                border: `1px solid ${theme.palette.divider}`,
-                                flexGrow: 1,
-                                position: "relative",
-                                overflow: "hidden",
-                              }}
-                            >
-                              {walletIsVisible ? (
-                                publicWalletAddress
-                              ) : (
-                                <>
-                                  {publicWalletAddress.substring(0, 6)}...
-                                  {publicWalletAddress.substring(
-                                    publicWalletAddress.length - 4
+                            <Card sx={{ p: 0 }}>
+                              <CardContent
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "cetner",
+                                }}
+                              >
+                                <Typography
+                                  component="span"
+                                  variant="body2"
+                                  fontFamily="monospace"
+                                  sx={{
+                                    wordBreak: "break-all",
+                                  }}
+                                >
+                                  {walletIsVisible ? (
+                                    publicWalletAddress
+                                  ) : (
+                                    <>
+                                      {publicWalletAddress.substring(0, 6)}...
+                                      {publicWalletAddress.substring(
+                                        publicWalletAddress.length - 4
+                                      )}
+                                    </>
                                   )}
-                                </>
-                              )}
-                            </Typography>
+                                </Typography>
+                              </CardContent>
+                            </Card>
                             <IconButton
                               onClick={() =>
                                 setWalletIsVisible(!walletIsVisible)

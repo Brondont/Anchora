@@ -58,6 +58,7 @@ const AdminUserForm: React.FC = () => {
     Roles: [],
     CreatedAt: "",
     UpdatedAt: "",
+    publicWalletAddress: "",
   });
   const [editedUserForm, setEditedUserForm] = useState<UserFormProps>({
     email: { value: "", error: "", validators: [isEmail, isRequired] },
@@ -210,6 +211,7 @@ const AdminUserForm: React.FC = () => {
       updateEditUser({
         ID: 0,
         email: "",
+        publicWalletAddress: "",
         firstName: "",
         lastName: "",
         phoneNumber: "",

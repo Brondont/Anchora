@@ -1,12 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Box } from "@mui/material";
-import {
-  Routes,
-  Route,
-  Navigate,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 
@@ -26,6 +20,8 @@ import AdminSpace from "./pages/admin/AdminSpace";
 import AccountActivationPage from "./pages/AccountActivationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import PasswordResetPage from "./pages/PasswordResetPage";
+import TransactionTestPage from "./pages/TransactionsTestPage";
+import NotFoundPage from "./pages/NotFoundPage";
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -180,6 +176,12 @@ const App: React.FC = () => {
                 </>
               ) : (
                 <>
+                  {/* this is for testing purposes only */}
+                  <Route
+                    path="/transactions"
+                    element={<TransactionTestPage />}
+                  />
+
                   <Route
                     path="/profile/:userID"
                     element={<ProfilePage activeUser={user} />}
@@ -202,7 +204,7 @@ const App: React.FC = () => {
                   />
                 </>
               )}
-              <Route path="*" element={<Navigate to="/" />} />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
           )}
         </Box>

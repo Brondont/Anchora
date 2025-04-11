@@ -38,9 +38,6 @@ const baseTheme: ThemeOptions = {
       styleOverrides: {
         root: ({ theme }) => ({
           borderRadius: "8px",
-          "&:hover": {
-            backgroundColor: lighten(theme.palette.primary.main, 0.2),
-          },
         }),
       },
     },
