@@ -1,1141 +1,728 @@
-import React, { ChangeEvent, useState, useEffect, useCallback } from "react";
+import React, { ChangeEvent, useState, useEffect } from "react";
 import {
   Box,
   Card,
   CardContent,
-  Typography,
-  TextField,
-  Button,
+  Divider,
   FormControl,
   InputLabel,
-  Select,
   MenuItem,
   OutlinedInput,
+  Select,
   SelectChangeEvent,
-  keyframes,
-  Divider,
-  Skeleton,
-  Chip,
+  TextField,
+  Typography,
+  Button,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
-import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { useSearchParams } from "react-router-dom";
+import { Calendar, dayjsLocalizer } from "react-big-calendar";
+import "react-big-calendar/lib/css/react-big-calendar.css";
+import dayjs, { Dayjs } from "dayjs";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import EventNoteIcon from "@mui/icons-material/EventNote";
+import FileUpload from "../fileUpload/FileUpload";
+import { isRequired, ValidatorFunction } from "../../util/validators";
 import { useFeedback } from "../../FeedbackAlertContext";
-import { isLength, isRequired, ValidatorFunction } from "../../util/validators";
 
-interface Sector {
-  ID: number;
-  Code: string;
-  Description: string;
-}
-
-interface Document {
-  ID: number;
-  Name: string;
-  URL: string;
-  DocumentableID: number;
-  DocumentableType: string;
-}
-
-interface OfferProps {
-  ID: number;
-  title: string;
-  description: string;
-  createdBy: number;
-  documents: Document[];
-  budget: number;
-  currency: string;
-  category: string;
-  sectors: Sector[];
-  qualificationRequired: string;
-  location: string;
-  proposalSubmissionStart: string;
-  proposalSubmissionEnd: string;
-  bidDeadline: string;
-  offerValidityEnd: string;
-  status: string;
-  winningBidID: number;
-}
-
-export type OfferFormProps = {
+type OfferFormProps = {
   [key: string]: {
-    value: string | number | Date | number[] | string[];
+    value: string | number | undefined;
     validators?: ValidatorFunction[];
     error: string;
   };
 };
 
-interface ServerFormError {
-  path: string;
-  msg: string;
+interface CalendarEvent {
+  id: number;
+  title: string;
+  start: Date;
+  end: Date;
 }
 
-const shakeAnimation = keyframes`
-  0% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  50% { transform: translateX(5px); }
-  75% { transform: translateX(-5px); }
-  100% { transform: translateX(0); }
-`;
+type SectorOption = {
+  code: string;
+  description: string;
+};
 
-const currencyOptions = [
-  { code: "USD", label: "US Dollar ($)" },
-  { code: "EUR", label: "Euro (€)" },
-  { code: "GBP", label: "British Pound (£)" },
-  { code: "DZD", label: "Algerian Dinar (DA)" },
-];
+const localizer = dayjsLocalizer(dayjs);
 
-const categoryOptions = [
-  "Construction",
-  "IT Services",
-  "Consulting",
-  "Equipment Supply",
-  "Maintenance",
-  "Research",
-  "Healthcare",
-  "Education",
-  "Energy",
-  "Transportation",
-];
+const currencyOptions = [{ code: "DZD", label: "Algerian Dinar (DA)" }];
+
+const eventStyleGetter = (_: CalendarEvent) => ({
+  style: {
+    backgroundColor: "#3174ad",
+    borderRadius: "5px",
+    opacity: 0.9,
+    color: "white",
+    border: "1px solid #2a5985",
+    display: "block",
+    padding: "4px 8px",
+    fontWeight: 500,
+  },
+});
+
+const isAfterDate = (
+  date: Dayjs | null,
+  compareDate: Dayjs | null
+): boolean => {
+  if (!date || !compareDate) return false;
+  return date.isAfter(compareDate);
+};
 
 const TenderOffers: React.FC = () => {
-  const [offer, setOffer] = useState<OfferProps>({
-    ID: 0,
-    title: "",
-    description: "",
-    createdBy: 0,
-    documents: [],
-    budget: 0,
-    currency: "",
-    category: "",
-    sectors: [],
-    qualificationRequired: "",
-    location: "",
-    proposalSubmissionStart: "",
-    proposalSubmissionEnd: "",
-    bidDeadline: "",
-    offerValidityEnd: "",
-    status: "open",
-    winningBidID: 0,
-  });
-
-  const [editedOfferForm, setEditedOfferForm] = useState<OfferFormProps>({
-    title: {
-      value: "",
-      error: "",
-      validators: [isRequired, isLength({ min: 5, max: 200 })],
-    },
-    description: {
-      value: "",
-      error: "",
-      validators: [isRequired, isLength({ min: 10, max: 2000 })],
-    },
+  const [offerForm, setOfferForm] = useState<OfferFormProps>({
+    title: { value: "", error: "", validators: [isRequired] },
+    description: { value: "", error: "", validators: [isRequired] },
     budget: { value: 0, error: "", validators: [isRequired] },
     currency: { value: "", error: "", validators: [isRequired] },
     category: { value: "", error: "", validators: [isRequired] },
-    sectorIDs: { value: [], error: "", validators: [isRequired] },
-    qualificationRequired: { value: "", error: "", validators: [isRequired] },
-    location: { value: "", error: "", validators: [isRequired] },
-    proposalSubmissionStart: {
-      value: new Date(),
-      error: "",
-      validators: [isRequired],
-    },
-    proposalSubmissionEnd: {
-      value: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      error: "",
-      validators: [isRequired],
-    },
-    bidDeadline: {
-      value: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-      error: "",
-      validators: [isRequired],
-    },
-    offerValidityEnd: {
-      value: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      error: "",
-      validators: [isRequired],
-    },
+    offerActiveStart: { value: "", error: "", validators: [isRequired] },
+    proposalSubmissionStart: { value: "", error: "", validators: [isRequired] },
+    proposalSubmissionEnd: { value: "", error: "", validators: [isRequired] },
+    proposalReviewEnd: { value: "", error: "", validators: [isRequired] },
+    offerActiveEnd: { value: "", error: "", validators: [isRequired] },
   });
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [paramOfferID, setParamOfferID] = useState<string | undefined>();
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [isShake, setIsShake] = useState<boolean>(false);
-  const [availableSectors, setAvailableSectors] = useState<Sector[]>([]);
-
-  const apiUrl = import.meta.env.VITE_API_URL;
-  const token = localStorage.getItem("token");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sectorOptions, setSectorOptions] = useState<SectorOption[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [calendarView, setCalendarView] = useState<"month" | "week" | "day">(
+    "week"
+  );
+  const [files, setFiles] = useState<File[]>([]);
   const { showFeedback } = useFeedback();
 
-  const fetchSectors = useCallback(async () => {
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  const fetchSectors = async () => {
     try {
       const res = await fetch(`${apiUrl}/sectors`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        method: "GET",
       });
-      const data = await res.json();
-      if (data.error) throw data.error;
-      setAvailableSectors(data.sectors);
-    } catch (err: any) {
-      showFeedback(err.msg || "Failed to fetch sectors", false);
-    }
-  }, [apiUrl, token, showFeedback]);
 
-  const fetchOffer = useCallback(
-    async (offerID: string) => {
-      setIsLoading(true);
-      try {
-        const res = await fetch(`${apiUrl}/offer/${offerID}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+      const resData = await res.json();
 
-        const resData = await res.json();
-
-        if (resData.error) throw resData.error;
-
-        setOffer(resData.offer);
-        updateEditOffer(resData.offer);
-      } catch (err: any) {
-        showFeedback(err.msg || "Failed to get offer, reload the page.", false);
-      } finally {
-        setIsLoading(false);
+      if (resData.error) {
+        throw resData.error;
       }
-    },
-    [apiUrl, token, showFeedback]
-  );
+
+      setSectorOptions(resData.sectors);
+    } catch (err: any) {
+      showFeedback(
+        err.msg || "something went wrong loading data, reload your page",
+        false
+        // TOOD: work on refresh tokens or wahtever they're called
+      );
+    }
+  };
 
   useEffect(() => {
     fetchSectors();
-    // get param from url
-    const offerID = searchParams.get("offerID");
-    if (!offerID) return;
-    setParamOfferID(offerID);
+  }, []);
 
-    fetchOffer(offerID);
-  }, [fetchSectors, fetchOffer, searchParams]);
+  useEffect(() => {
+    const newEvents: CalendarEvent[] = [];
+    const {
+      offerActiveStart,
+      proposalSubmissionStart,
+      proposalSubmissionEnd,
+      proposalReviewEnd,
+      offerActiveEnd,
+    } = offerForm;
+
+    if (offerActiveStart.value && proposalSubmissionStart.value) {
+      newEvents.push({
+        id: 1,
+        title: "Offer Publication Phase",
+        start: new Date(offerActiveStart.value as string),
+        end: new Date(proposalSubmissionStart.value as string),
+      });
+    }
+
+    if (proposalSubmissionStart.value && proposalSubmissionEnd.value) {
+      newEvents.push({
+        id: 2,
+        title: "Proposal Submission Phase",
+        start: new Date(proposalSubmissionStart.value as string),
+        end: new Date(proposalSubmissionEnd.value as string),
+      });
+    }
+
+    if (proposalSubmissionEnd.value && proposalReviewEnd.value) {
+      newEvents.push({
+        id: 3,
+        title: "Evaluation Phase",
+        start: new Date(proposalSubmissionEnd.value as string),
+        end: new Date(proposalReviewEnd.value as string),
+      });
+    }
+
+    if (proposalReviewEnd.value && offerActiveEnd.value) {
+      newEvents.push({
+        id: 4,
+        title: "Award Announcement Phase",
+        start: new Date(proposalReviewEnd.value as string),
+        end: new Date(offerActiveEnd.value as string),
+      });
+    }
+
+    setEvents(newEvents);
+  }, [
+    offerForm.offerActiveStart.value,
+    offerForm.proposalSubmissionStart.value,
+    offerForm.proposalSubmissionEnd.value,
+    offerForm.proposalReviewEnd.value,
+    offerForm.offerActiveEnd.value,
+  ]);
 
   const inputChangeHandler = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = event.target;
-
-    setEditedOfferForm((prevState: OfferFormProps) => {
-      const fieldConfig = prevState[name];
-      // run all validators and collect error messages
-      if (fieldConfig.validators) {
-        for (const validator of fieldConfig.validators) {
-          const result = validator(value);
-          if (!result.isValid) {
-            return {
-              ...prevState,
-              [name]: {
-                ...prevState[name],
-                value,
-                error: result.errorMessage,
-              },
-            };
-          }
-        }
-      }
-      return {
-        ...prevState,
-        [name]: {
-          ...prevState[name],
-          value,
-          error: "",
-        },
-      };
-    });
-  };
-
-  const handleNumberInputChange = (
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = event.target;
-    const numValue = parseFloat(value);
-
-    setEditedOfferForm((prevState: OfferFormProps) => {
-      const fieldConfig = prevState[name];
-      // run all validators and collect error messages
-      if (fieldConfig.validators) {
-        for (const validator of fieldConfig.validators) {
-          const result = validator(numValue);
-          if (!result.isValid) {
-            return {
-              ...prevState,
-              [name]: {
-                ...prevState[name],
-                value: numValue,
-                error: result.errorMessage,
-              },
-            };
-          }
-        }
-      }
-      return {
-        ...prevState,
-        [name]: {
-          ...prevState[name],
-          value: numValue,
-          error: "",
-        },
-      };
-    });
-  };
-
-  const handleDateChange = (name: string, date: Date | null) => {
-    if (!date) return;
-
-    setEditedOfferForm((prevState: OfferFormProps) => {
-      const fieldConfig = prevState[name];
-      // run all validators and collect error messages
-      if (fieldConfig.validators) {
-        for (const validator of fieldConfig.validators) {
-          const result = validator(date);
-          if (!result.isValid) {
-            return {
-              ...prevState,
-              [name]: {
-                ...prevState[name],
-                value: date,
-                error: result.errorMessage,
-              },
-            };
-          }
-        }
-      }
-      return {
-        ...prevState,
-        [name]: {
-          ...prevState[name],
-          value: date,
-          error: "",
-        },
-      };
-    });
+    validateField(name, value);
   };
 
   const handleSelectChange = (event: SelectChangeEvent<string>) => {
     const { name, value } = event.target;
+    validateField(name, value);
+  };
 
-    setEditedOfferForm((prevState: OfferFormProps) => {
-      const fieldConfig = prevState[name];
-      // run all validators and collect error messages
-      if (fieldConfig.validators) {
-        for (const validator of fieldConfig.validators) {
+  const validateField = (name: string, value: any) => {
+    setOfferForm((prev) => {
+      const field = prev[name];
+      if (field.validators) {
+        for (const validator of field.validators) {
           const result = validator(value);
           if (!result.isValid) {
             return {
-              ...prevState,
-              [name]: {
-                ...prevState[name],
-                value,
-                error: result.errorMessage,
-              },
+              ...prev,
+              [name]: { ...field, value, error: result.errorMessage },
             };
           }
         }
       }
-      return {
-        ...prevState,
-        [name]: {
-          ...prevState[name],
-          value,
-          error: "",
-        },
-      };
+      return { ...prev, [name]: { ...field, value, error: "" } };
     });
   };
 
-  const handleSectorsChange = (event: SelectChangeEvent<number[]>) => {
-    const selectedSectorIDs = event.target.value as number[];
+  const validateDate = (name: string, date: Dayjs | null): string => {
+    if (!date) return "Date is required";
 
-    setEditedOfferForm((prev) => {
-      // Check if sectors are selected
-      let error = "";
-      if (prev.sectorIDs.validators) {
-        for (const validator of prev.sectorIDs.validators) {
-          const result = validator(selectedSectorIDs);
-          if (!result.isValid) {
-            error = result.errorMessage;
-            break;
-          }
+    // Ensure date is in the future
+    if (!date.isAfter(dayjs())) {
+      return "Date must be after current date";
+    }
+
+    // Validate the chronological order of dates
+    switch (name) {
+      case "offerActiveStart":
+        return ""; // This is the first date, no previous date to compare with
+
+      case "proposalSubmissionStart":
+        const offerActiveStartDate = offerForm.offerActiveStart.value
+          ? dayjs(offerForm.offerActiveStart.value)
+          : null;
+
+        if (offerActiveStartDate && !isAfterDate(date, offerActiveStartDate)) {
+          return "Submission start must be after offer active start";
         }
-      }
+        return "";
 
-      return {
-        ...prev,
-        sectorIDs: {
-          ...prev.sectorIDs,
-          value: selectedSectorIDs,
-          error: error,
-        },
-      };
-    });
-  };
+      case "proposalSubmissionEnd":
+        const proposalStartDate = offerForm.proposalSubmissionStart.value
+          ? dayjs(offerForm.proposalSubmissionStart.value)
+          : null;
 
-  const shakeFields = useCallback(() => {
-    setIsShake(true);
-    setTimeout(() => setIsShake(false), 500);
-  }, []);
+        if (proposalStartDate && !isAfterDate(date, proposalStartDate)) {
+          return "Submission end must be after submission start";
+        }
+        return "";
 
-  const handleCancel = () => {
-    if (!paramOfferID) {
-      // Clear form for new offer
-      setEditedOfferForm({
-        title: {
-          value: "",
-          error: "",
-          validators: [isRequired, isLength({ min: 5, max: 200 })],
-        },
-        description: {
-          value: "",
-          error: "",
-          validators: [isRequired, isLength({ min: 10, max: 2000 })],
-        },
-        budget: {
-          value: 0,
-          error: "",
-          validators: [isRequired],
-        },
-        currency: { value: "", error: "", validators: [isRequired] },
-        category: { value: "", error: "", validators: [isRequired] },
-        sectorIDs: { value: [], error: "", validators: [isRequired] },
-        qualificationRequired: {
-          value: "",
-          error: "",
-          validators: [isRequired],
-        },
-        location: { value: "", error: "", validators: [isRequired] },
-        proposalSubmissionStart: {
-          value: new Date(),
-          error: "",
-          validators: [isRequired],
-        },
-        proposalSubmissionEnd: {
-          value: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-          error: "",
-          validators: [isRequired],
-        },
-        bidDeadline: {
-          value: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-          error: "",
-          validators: [isRequired],
-        },
-        offerValidityEnd: {
-          value: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          error: "",
-          validators: [isRequired],
-        },
-      });
-    } else {
-      // Reset to saved offer
-      updateEditOffer(offer);
+      case "proposalReviewEnd":
+        const proposalEndDate = offerForm.proposalSubmissionEnd.value
+          ? dayjs(offerForm.proposalSubmissionEnd.value)
+          : null;
+
+        if (proposalEndDate && !isAfterDate(date, proposalEndDate)) {
+          return "Review end must be after submission end";
+        }
+        return "";
+
+      case "offerActiveEnd":
+        const reviewEndDate = offerForm.proposalReviewEnd.value
+          ? dayjs(offerForm.proposalReviewEnd.value)
+          : null;
+
+        if (reviewEndDate && !isAfterDate(date, reviewEndDate)) {
+          return "Offer end must be after review end";
+        }
+        return "";
+
+      default:
+        return "";
     }
   };
 
-  const updateEditOffer = (offer: OfferProps) => {
-    // Extract sector IDs
-    const sectorIDs = offer.sectors
-      ? offer.sectors.map((sector) => sector.ID)
-      : [];
+  const handleDateChange = (name: string, date: Dayjs | null) => {
+    if (!date) return;
 
-    const proposalSubmissionStart = offer.proposalSubmissionStart
-      ? new Date(offer.proposalSubmissionStart)
-      : new Date();
-    const proposalSubmissionEnd = offer.proposalSubmissionEnd
-      ? new Date(offer.proposalSubmissionEnd)
-      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const bidDeadline = offer.bidDeadline
-      ? new Date(offer.bidDeadline)
-      : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-    const offerValidityEnd = offer.offerValidityEnd
-      ? new Date(offer.offerValidityEnd)
-      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const error = validateDate(name, date);
 
-    setEditedOfferForm({
-      title: {
-        value: offer.title,
-        error: "",
-        validators: [isRequired, isLength({ min: 5, max: 200 })],
+    setOfferForm((prev) => ({
+      ...prev,
+      [name]: {
+        ...prev[name],
+        value: date.toISOString(),
+        error: error,
       },
-      description: {
-        value: offer.description,
-        error: "",
-        validators: [isRequired, isLength({ min: 10, max: 2000 })],
-      },
-      budget: {
-        value: offer.budget,
-        error: "",
-        validators: [isRequired],
-      },
-      currency: {
-        value: offer.currency,
-        error: "",
-        validators: [isRequired],
-      },
-      category: {
-        value: offer.category,
-        error: "",
-        validators: [isRequired],
-      },
-      sectorIDs: {
-        value: sectorIDs,
-        error: "",
-        validators: [isRequired],
-      },
-      qualificationRequired: {
-        value: offer.qualificationRequired,
-        error: "",
-        validators: [isRequired],
-      },
-      location: {
-        value: offer.location,
-        error: "",
-        validators: [isRequired],
-      },
-      proposalSubmissionStart: {
-        value: proposalSubmissionStart,
-        error: "",
-        validators: [isRequired],
-      },
-      proposalSubmissionEnd: {
-        value: proposalSubmissionEnd,
-        error: "",
-        validators: [isRequired],
-      },
-      bidDeadline: {
-        value: bidDeadline,
-        error: "",
-        validators: [isRequired],
-      },
-      offerValidityEnd: {
-        value: offerValidityEnd,
-        error: "",
-        validators: [isRequired],
-      },
-    });
+    }));
   };
 
-  const validateForm = (): boolean => {
+  // Validate all dates when submitting the form
+  const validateAllDates = (): boolean => {
     let isValid = true;
-    const updatedForm = { ...editedOfferForm };
+    const dateFields = [
+      "offerActiveStart",
+      "proposalSubmissionStart",
+      "proposalSubmissionEnd",
+      "proposalReviewEnd",
+      "offerActiveEnd",
+    ];
 
-    // Check each field and update errors
-    Object.entries(updatedForm).forEach(([fieldName, fieldConfig]) => {
-      // Skip if no validators
-      if (!fieldConfig.validators) return;
+    const updatedForm = { ...offerForm };
 
-      // Check for empty required fields
-      for (const validator of fieldConfig.validators) {
-        const result = validator(fieldConfig.value);
-        if (!result.isValid) {
-          updatedForm[fieldName] = {
-            ...fieldConfig,
-            error: result.errorMessage,
+    dateFields.forEach((field) => {
+      if (updatedForm[field].value) {
+        const date = dayjs(updatedForm[field].value as string);
+        const error = validateDate(field, date);
+
+        if (error) {
+          updatedForm[field] = {
+            ...updatedForm[field],
+            error,
           };
           isValid = false;
-          break;
         }
+      } else {
+        updatedForm[field] = {
+          ...updatedForm[field],
+          error: "Date is required",
+        };
+        isValid = false;
       }
     });
 
-    // Specific validation for sectors (check if any sector is selected)
-    const selectedSectorIDs = updatedForm.sectorIDs.value as number[];
-    if (selectedSectorIDs.length === 0) {
-      updatedForm.sectorIDs = {
-        ...updatedForm.sectorIDs,
-        error: "At least one sector is required",
-      };
-      isValid = false;
-    }
-
-    // Date validations
-    const startDate = updatedForm.proposalSubmissionStart.value as Date;
-    const endDate = updatedForm.proposalSubmissionEnd.value as Date;
-    const bidDeadline = updatedForm.bidDeadline.value as Date;
-    const validityEndDate = updatedForm.offerValidityEnd.value as Date;
-
-    if (endDate <= startDate) {
-      updatedForm.proposalSubmissionEnd = {
-        ...updatedForm.proposalSubmissionEnd,
-        error: "End date must be after start date",
-      };
-      isValid = false;
-    }
-
-    if (bidDeadline <= endDate) {
-      updatedForm.bidDeadline = {
-        ...updatedForm.bidDeadline,
-        error: "Bid deadline must be after submission end date",
-      };
-      isValid = false;
-    }
-
-    if (validityEndDate <= bidDeadline) {
-      updatedForm.offerValidityEnd = {
-        ...updatedForm.offerValidityEnd,
-        error: "Validity end date must be after bid deadline",
-      };
-      isValid = false;
-    }
-
-    // Shake fields if validation failed
-    if (!isValid) {
-      setEditedOfferForm(updatedForm);
-      shakeFields();
-    }
-
+    setOfferForm(updatedForm);
     return isValid;
   };
 
-  const handleSubmit = async () => {
-    if (!editedOfferForm) return;
+  const handleFileUpload = (newFiles: File[]) => {
+    setFiles((prevFiles) => [...prevFiles, ...newFiles]);
+  };
 
-    if (!validateForm()) {
-      return;
+  const handleRemoveFile = (index: number) => {
+    setFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = () => {
+    // Validate all fields including dates
+    if (!validateAllDates()) {
+      return; // Stop submission if validation fails
     }
 
     setIsSubmitting(true);
-    try {
-      const url = paramOfferID
-        ? `${apiUrl}/offer/${paramOfferID}`
-        : `${apiUrl}/offer`;
-
-      const method = paramOfferID ? "PUT" : "POST";
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: editedOfferForm.title.value,
-          description: editedOfferForm.description.value,
-          budget: editedOfferForm.budget.value,
-          currency: editedOfferForm.currency.value,
-          category: editedOfferForm.category.value,
-          sectorIDs: editedOfferForm.sectorIDs.value,
-          qualificationRequired: editedOfferForm.qualificationRequired.value,
-          location: editedOfferForm.location.value,
-          proposalSubmissionStart: (
-            editedOfferForm.proposalSubmissionStart.value as Date
-          ).toISOString(),
-          proposalSubmissionEnd: (
-            editedOfferForm.proposalSubmissionEnd.value as Date
-          ).toISOString(),
-          bidDeadline: (
-            editedOfferForm.bidDeadline.value as Date
-          ).toISOString(),
-          offerValidityEnd: (
-            editedOfferForm.offerValidityEnd.value as Date
-          ).toISOString(),
-        }),
-      });
-
-      const resData = await res.json();
-
-      if (!res.ok) {
-        if ([422, 409, 404, 401].includes(res.status)) {
-          const updatedForm: OfferFormProps = { ...editedOfferForm };
-          resData.error.forEach((err: ServerFormError) => {
-            if (updatedForm[err.path]) {
-              updatedForm[err.path].error = err.msg;
-            }
-          });
-          setEditedOfferForm(updatedForm);
-          shakeFields();
-          return;
-        }
-        throw new Error(resData.error || "An error occurred");
-      }
-
-      if (resData.error) throw resData.error;
-
-      showFeedback(
-        `Offer ${paramOfferID ? "updated" : "created"} successfully`,
-        true
-      );
-
-      if (!paramOfferID) {
-        // Clear form after successful creation
-        handleCancel();
-      }
-    } catch (err: any) {
-      showFeedback(
-        err.msg || `Failed to ${paramOfferID ? "update" : "create"} offer`,
-        false
-      );
-    } finally {
+    // Submit logic here
+    setTimeout(() => {
       setIsSubmitting(false);
-    }
+      // Here you would typically call your API
+    }, 1500);
   };
 
-  if (isLoading) {
-    return (
-      <Box sx={{ display: "flex", minHeight: "100vh", padding: 3 }}>
-        <Card sx={{ width: "100%", overflow: "hidden" }}>
-          <CardContent>
-            <Box sx={{ mb: 4 }}>
-              <Skeleton variant="text" width={200} height={40} sx={{ mb: 4 }} />
-              <Box
-                sx={{ mt: 4, display: "flex", gap: 8, flexDirection: "column" }}
-              >
-                <Skeleton variant="rectangular" height={56} />
-                <Skeleton variant="rectangular" height={100} />
-                <Box sx={{ display: "flex", gap: 4 }}>
-                  <Skeleton
-                    variant="rectangular"
-                    height={56}
-                    sx={{ flex: 1 }}
-                  />
-                  <Skeleton
-                    variant="rectangular"
-                    height={56}
-                    sx={{ flex: 1 }}
-                  />
-                </Box>
-                <Skeleton variant="rectangular" height={56} />
-                <Skeleton variant="rectangular" height={56} />
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Box>
-    );
-  }
+  const handleCancel = () => {
+    setOfferForm({
+      title: { value: "", error: "", validators: [isRequired] },
+      description: { value: "", error: "", validators: [isRequired] },
+      budget: { value: 0, error: "", validators: [isRequired] },
+      currency: { value: "", error: "", validators: [isRequired] },
+      category: { value: "", error: "", validators: [isRequired] },
+      offerActiveStart: { value: "", error: "", validators: [isRequired] },
+      proposalSubmissionStart: {
+        value: "",
+        error: "",
+        validators: [isRequired],
+      },
+      proposalSubmissionEnd: { value: "", error: "", validators: [isRequired] },
+      proposalReviewEnd: { value: "", error: "", validators: [isRequired] },
+      offerActiveEnd: { value: "", error: "", validators: [isRequired] },
+    });
+    setFiles([]);
+    setEvents([]);
+  };
+
+  const shouldDisableDate = (date: Dayjs) => {
+    return date.isBefore(dayjs(), "day");
+  };
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", padding: 3 }}>
-      <Card sx={{ width: "100%", overflow: "hidden" }}>
-        <CardContent>
+    <Box sx={{ width: "100%" }}>
+      <Card elevation={3} sx={{ overflow: "visible", borderRadius: 2 }}>
+        <CardContent sx={{ p: 3 }}>
           <Box
             sx={{
               display: "flex",
               justifyContent: "space-between",
-              flexDirection: "column",
+              alignItems: "center",
               mb: 4,
             }}
           >
-            {paramOfferID ? (
-              <Box
-                sx={{
-                  display: "flex",
-                  width: "100%",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Typography variant="h5" fontWeight="bold">
-                  Edit Tender Offer
-                </Typography>
-                <Button
-                  onClick={() => {
-                    setSearchParams("");
-                    setParamOfferID("");
-                    handleCancel();
-                  }}
-                  variant="contained"
-                >
-                  Create New Offer
-                </Button>
-              </Box>
-            ) : (
-              <Typography variant="h5" fontWeight="bold">
-                Create New Tender Offer
-              </Typography>
-            )}
+            <Typography color="primary" variant="h5" fontWeight="bold">
+              Create New Tender Offer
+            </Typography>
+            <Tooltip title="Creating a tender offer will publish it to potential bidders once activated">
+              <IconButton>
+                <HelpOutlineIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
 
-            {/* Basic Information Section */}
-            <Box sx={{ mt: 4 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>
+          <Box sx={{ mb: 5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 500 }}>
                 Basic Information
               </Typography>
-              <Divider sx={{ mb: 3 }} />
-              <Box sx={{ display: "flex", gap: 3, flexDirection: "column" }}>
-                <TextField
-                  fullWidth
-                  label="Title"
-                  name="title"
-                  value={editedOfferForm?.title.value || ""}
-                  onChange={inputChangeHandler}
-                  error={editedOfferForm.title.error !== ""}
-                  helperText={editedOfferForm.title.error}
-                  sx={{
-                    ...(isShake && editedOfferForm.title.error !== ""
-                      ? { animation: `${shakeAnimation} 0.35s` }
-                      : {}),
-                  }}
-                  required
-                />
+              <Tooltip title="Enter the fundamental details of your tender offer">
+                <IconButton size="small" sx={{ ml: 1 }}>
+                  <InfoOutlinedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Divider sx={{ mb: 3 }} />
 
-                <TextField
-                  fullWidth
-                  label="Description"
-                  name="description"
-                  value={editedOfferForm?.description.value || ""}
-                  onChange={inputChangeHandler}
-                  error={editedOfferForm.description.error !== ""}
-                  helperText={editedOfferForm.description.error}
-                  multiline
-                  rows={4}
-                  sx={{
-                    ...(isShake && editedOfferForm.description.error !== ""
-                      ? { animation: `${shakeAnimation} 0.35s` }
-                      : {}),
-                  }}
-                  required
-                />
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <TextField
+                fullWidth
+                label="Tender Title"
+                name="title"
+                value={offerForm.title.value || ""}
+                onChange={inputChangeHandler}
+                error={!!offerForm.title.error}
+                helperText={
+                  offerForm.title.error ||
+                  "Enter a clear, concise title for your tender offer"
+                }
+                required
+              />
 
-                <Box sx={{ display: "flex", gap: 3 }}>
+              <TextField
+                fullWidth
+                label="Description"
+                name="description"
+                value={offerForm.description.value || ""}
+                onChange={inputChangeHandler}
+                error={!!offerForm.description.error}
+                helperText={
+                  offerForm.description.error ||
+                  "Provide detailed information about the tender requirements"
+                }
+                multiline
+                rows={4}
+                required
+              />
+
+              <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+                <FormControl sx={{ flexGrow: 1, minWidth: "200px" }}>
                   <TextField
                     fullWidth
                     type="number"
                     label="Budget"
                     name="budget"
-                    value={editedOfferForm?.budget.value || ""}
-                    onChange={handleNumberInputChange}
-                    error={editedOfferForm.budget.error !== ""}
-                    helperText={editedOfferForm.budget.error}
-                    sx={{
-                      ...(isShake && editedOfferForm.budget.error !== ""
-                        ? { animation: `${shakeAnimation} 0.35s` }
-                        : {}),
-                    }}
+                    value={offerForm.budget.value || ""}
+                    onChange={inputChangeHandler}
+                    error={!!offerForm.budget.error}
+                    helperText={
+                      offerForm.budget.error ||
+                      "Specify the budget allocated for this tender"
+                    }
                     required
                   />
+                </FormControl>
 
-                  <FormControl
-                    fullWidth
-                    error={editedOfferForm.currency.error !== ""}
-                    sx={{
-                      ...(isShake && editedOfferForm.currency.error !== ""
-                        ? { animation: `${shakeAnimation} 0.35s` }
-                        : {}),
-                    }}
-                  >
-                    <InputLabel id="currency-label">Currency</InputLabel>
-                    <Select
-                      labelId="currency-label"
-                      name="currency"
-                      value={editedOfferForm?.currency.value as string}
-                      onChange={handleSelectChange}
-                      input={<OutlinedInput label="Currency" />}
-                      required
-                    >
-                      {currencyOptions.map((option) => (
-                        <MenuItem key={option.code} value={option.code}>
-                          {option.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    {editedOfferForm.currency.error && (
-                      <Typography
-                        color="error"
-                        variant="caption"
-                        sx={{ ml: 2, mt: 0.5 }}
-                      >
-                        {editedOfferForm.currency.error}
-                      </Typography>
-                    )}
-                  </FormControl>
-                </Box>
-
-                <Box sx={{ display: "flex", gap: 3 }}>
-                  <FormControl
-                    fullWidth
-                    error={editedOfferForm.category.error !== ""}
-                    sx={{
-                      ...(isShake && editedOfferForm.category.error !== ""
-                        ? { animation: `${shakeAnimation} 0.35s` }
-                        : {}),
-                    }}
-                  >
-                    <InputLabel id="category-label">Category</InputLabel>
-                    <Select
-                      labelId="category-label"
-                      name="category"
-                      value={editedOfferForm?.category.value as string}
-                      onChange={handleSelectChange}
-                      input={<OutlinedInput label="Category" />}
-                      required
-                    >
-                      {categoryOptions.map((option) => (
-                        <MenuItem key={option} value={option}>
-                          {option}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    {editedOfferForm.category.error && (
-                      <Typography
-                        color="error"
-                        variant="caption"
-                        sx={{ ml: 2, mt: 0.5 }}
-                      >
-                        {editedOfferForm.category.error}
-                      </Typography>
-                    )}
-                  </FormControl>
-
-                  <FormControl
-                    fullWidth
-                    error={editedOfferForm.sectorIDs.error !== ""}
-                    sx={{
-                      ...(isShake && editedOfferForm.sectorIDs.error !== ""
-                        ? { animation: `${shakeAnimation} 0.35s` }
-                        : {}),
-                    }}
-                  >
-                    <InputLabel id="sectors-label">Sectors</InputLabel>
-                    <Select
-                      labelId="sectors-label"
-                      multiple
-                      value={editedOfferForm.sectorIDs.value as number[]}
-                      onChange={handleSectorsChange}
-                      input={<OutlinedInput label="Sectors" />}
-                      renderValue={(selected) => (
-                        <Box
-                          sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}
-                        >
-                          {(selected as number[]).map((value) => {
-                            const sector = availableSectors.find(
-                              (s) => s.ID === value
-                            );
-                            return (
-                              <Chip
-                                key={value}
-                                label={sector ? sector.Code : value}
-                              />
-                            );
-                          })}
-                        </Box>
-                      )}
-                      required
-                    >
-                      {availableSectors.map((sector) => (
-                        <MenuItem key={sector.ID} value={sector.ID}>
-                          <Box>
-                            <Typography variant="body1">
-                              {sector.Code}
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary">
-                              {sector.Description}
-                            </Typography>
-                          </Box>
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    {editedOfferForm.sectorIDs.error && (
-                      <Typography
-                        color="error"
-                        variant="caption"
-                        sx={{ ml: 2, mt: 0.5 }}
-                      >
-                        {editedOfferForm.sectorIDs.error}
-                      </Typography>
-                    )}
-                  </FormControl>
-                </Box>
-
-                <TextField
-                  fullWidth
-                  label="Location"
-                  name="location"
-                  value={editedOfferForm?.location.value || ""}
-                  onChange={inputChangeHandler}
-                  error={editedOfferForm.location.error !== ""}
-                  helperText={editedOfferForm.location.error}
-                  sx={{
-                    ...(isShake && editedOfferForm.location.error !== ""
-                      ? { animation: `${shakeAnimation} 0.35s` }
-                      : {}),
-                  }}
+                <FormControl
+                  sx={{ flexGrow: 1, minWidth: "200px" }}
+                  error={!!offerForm.currency.error}
                   required
-                />
+                >
+                  <InputLabel>Currency</InputLabel>
+                  <Select
+                    name="currency"
+                    value={offerForm.currency.value as string}
+                    onChange={handleSelectChange}
+                    input={<OutlinedInput label="Currency" />}
+                  >
+                    {currencyOptions.map((option) => (
+                      <MenuItem key={option.code} value={option.code}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
 
-                <TextField
-                  fullWidth
-                  label="Qualification Requirements"
-                  name="qualificationRequired"
-                  value={editedOfferForm?.qualificationRequired.value || ""}
-                  onChange={inputChangeHandler}
-                  error={editedOfferForm.qualificationRequired.error !== ""}
-                  helperText={editedOfferForm.qualificationRequired.error}
-                  multiline
-                  rows={3}
-                  sx={{
-                    ...(isShake &&
-                    editedOfferForm.qualificationRequired.error !== ""
-                      ? { animation: `${shakeAnimation} 0.35s` }
-                      : {}),
-                  }}
+                <FormControl
+                  sx={{ flexGrow: 1, minWidth: "200px" }}
+                  error={!!offerForm.category.error}
                   required
-                />
+                >
+                  <InputLabel>Sector</InputLabel>
+                  <Select
+                    name="category"
+                    value={offerForm.category.value as string}
+                    onChange={handleSelectChange}
+                    input={<OutlinedInput label="Sector" />}
+                  >
+                    {sectorOptions.map((option) => (
+                      <MenuItem key={option.code} value={option.code}>
+                        {`${option.code}: ${option.description}`}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Box>
-            </Box>
 
-            {/* Timeline Section */}
-            <Box sx={{ mt: 4 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>
+              <FileUpload
+                files={files}
+                onFileUpload={handleFileUpload}
+                onFileRemove={handleRemoveFile}
+              />
+            </Box>
+          </Box>
+
+          <Box sx={{ mb: 4 }}>
+            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 500 }}>
                 Timeline
               </Typography>
-              <Divider sx={{ mb: 3 }} />
-              <Box sx={{ display: "flex", gap: 3, flexDirection: "column" }}>
-                <LocalizationProvider dateAdapter={AdapterDateFns}>
-                  <Box sx={{ display: "flex", gap: 3 }}>
-                    <LocalizationProvider dateAdapter={AdapterDateFns}>
-                      <Box sx={{ display: "flex", gap: 3 }}>
-                        <DateTimePicker
-                          label="Proposal Submission Start"
-                          value={
-                            editedOfferForm?.proposalSubmissionStart
-                              .value instanceof Date
-                              ? editedOfferForm.proposalSubmissionStart.value
-                              : null
-                          }
-                          onChange={(date) =>
-                            handleDateChange("proposalSubmissionStart", date)
-                          }
-                          sx={{
-                            width: "100%",
-                            ...(isShake &&
-                            editedOfferForm.proposalSubmissionStart.error !== ""
-                              ? { animation: `${shakeAnimation} 0.35s` }
-                              : {}),
-                          }}
-                          slotProps={{
-                            textField: {
-                              error:
-                                editedOfferForm.proposalSubmissionStart
-                                  .error !== "",
-                              helperText:
-                                editedOfferForm.proposalSubmissionStart.error,
-                              required: true,
-                            },
-                          }}
-                        />
-                        <DateTimePicker
-                          label="Proposal Submission End"
-                          value={
-                            editedOfferForm?.proposalSubmissionEnd
-                              .value instanceof Date
-                              ? editedOfferForm.proposalSubmissionEnd.value
-                              : null
-                          }
-                          onChange={(date) =>
-                            handleDateChange("proposalSubmissionEnd", date)
-                          }
-                          sx={{
-                            width: "100%",
-                            ...(isShake &&
-                            editedOfferForm.proposalSubmissionEnd.error !== ""
-                              ? { animation: `${shakeAnimation} 0.35s` }
-                              : {}),
-                          }}
-                          slotProps={{
-                            textField: {
-                              error:
-                                editedOfferForm.proposalSubmissionEnd.error !==
-                                "",
-                              helperText:
-                                editedOfferForm.proposalSubmissionEnd.error,
-                              required: true,
-                            },
-                          }}
-                        />
-                      </Box>
-                      <Box sx={{ display: "flex", gap: 3 }}>
-                        <DateTimePicker
-                          label="Bid Deadline"
-                          value={
-                            editedOfferForm?.bidDeadline.value instanceof Date
-                              ? editedOfferForm.bidDeadline.value
-                              : null
-                          }
-                          onChange={(date) =>
-                            handleDateChange("bidDeadline", date)
-                          }
-                          sx={{
-                            width: "100%",
-                            ...(isShake &&
-                            editedOfferForm.bidDeadline.error !== ""
-                              ? { animation: `${shakeAnimation} 0.35s` }
-                              : {}),
-                          }}
-                          slotProps={{
-                            textField: {
-                              error: editedOfferForm.bidDeadline.error !== "",
-                              helperText: editedOfferForm.bidDeadline.error,
-                              required: true,
-                            },
-                          }}
-                        />
-                        <DateTimePicker
-                          label="Offer Validity End"
-                          value={
-                            editedOfferForm?.offerValidityEnd.value instanceof
-                            Date
-                              ? editedOfferForm.offerValidityEnd.value
-                              : null
-                          }
-                          onChange={(date) =>
-                            handleDateChange("offerValidityEnd", date)
-                          }
-                          sx={{
-                            width: "100%",
-                            ...(isShake &&
-                            editedOfferForm.offerValidityEnd.error !== ""
-                              ? { animation: `${shakeAnimation} 0.35s` }
-                              : {}),
-                          }}
-                          slotProps={{
-                            textField: {
-                              error:
-                                editedOfferForm.offerValidityEnd.error !== "",
-                              helperText:
-                                editedOfferForm.offerValidityEnd.error,
-                              required: true,
-                            },
-                          }}
-                        />
-                      </Box>
-                    </LocalizationProvider>
-                  </Box>
-                </LocalizationProvider>
-              </Box>
+              <Tooltip title="Define the key dates for your tender process">
+                <IconButton size="small" sx={{ ml: 1 }}>
+                  <EventNoteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
             </Box>
+            <Divider sx={{ mb: 3 }} />
 
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 2,
-                mt: 4,
-              }}
-            >
-              <Button
-                variant="outlined"
-                onClick={handleCancel}
-                disabled={isSubmitting}
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, mb: 4 }}>
+                <Card
+                  variant="outlined"
+                  sx={{ p: 3, width: "100%", bgcolor: "background.default" }}
+                >
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                    <DateTimePicker
+                      label="Offer Active Start"
+                      value={
+                        offerForm.offerActiveStart.value
+                          ? dayjs(offerForm.offerActiveStart.value)
+                          : null
+                      }
+                      onChange={(date) =>
+                        handleDateChange("offerActiveStart", date)
+                      }
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          size: "small",
+                          error: !!offerForm.offerActiveStart.error,
+                          helperText: offerForm.offerActiveStart.error || "",
+                        },
+                      }}
+                      shouldDisableDate={shouldDisableDate}
+                      sx={{ minWidth: 250, flexGrow: 1 }}
+                    />
+                    <DateTimePicker
+                      label="Proposal Submission Start"
+                      value={
+                        offerForm.proposalSubmissionStart.value
+                          ? dayjs(offerForm.proposalSubmissionStart.value)
+                          : null
+                      }
+                      onChange={(date) =>
+                        handleDateChange("proposalSubmissionStart", date)
+                      }
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          size: "small",
+                          error: !!offerForm.proposalSubmissionStart.error,
+                          helperText:
+                            offerForm.proposalSubmissionStart.error || "",
+                        },
+                      }}
+                      shouldDisableDate={shouldDisableDate}
+                      sx={{ minWidth: 250, flexGrow: 1 }}
+                    />
+                    <DateTimePicker
+                      label="Proposal Submission End"
+                      value={
+                        offerForm.proposalSubmissionEnd.value
+                          ? dayjs(offerForm.proposalSubmissionEnd.value)
+                          : null
+                      }
+                      onChange={(date) =>
+                        handleDateChange("proposalSubmissionEnd", date)
+                      }
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          size: "small",
+                          error: !!offerForm.proposalSubmissionEnd.error,
+                          helperText:
+                            offerForm.proposalSubmissionEnd.error || "",
+                        },
+                      }}
+                      shouldDisableDate={shouldDisableDate}
+                      sx={{ minWidth: 250, flexGrow: 1 }}
+                    />
+                    <DateTimePicker
+                      label="Proposal Review End"
+                      value={
+                        offerForm.proposalReviewEnd.value
+                          ? dayjs(offerForm.proposalReviewEnd.value)
+                          : null
+                      }
+                      onChange={(date) =>
+                        handleDateChange("proposalReviewEnd", date)
+                      }
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          size: "small",
+                          error: !!offerForm.proposalReviewEnd.error,
+                          helperText: offerForm.proposalReviewEnd.error || "",
+                        },
+                      }}
+                      shouldDisableDate={shouldDisableDate}
+                      sx={{ minWidth: 250, flexGrow: 1 }}
+                    />
+                    <DateTimePicker
+                      label="Offer Active End"
+                      value={
+                        offerForm.offerActiveEnd.value
+                          ? dayjs(offerForm.offerActiveEnd.value)
+                          : null
+                      }
+                      onChange={(date) =>
+                        handleDateChange("offerActiveEnd", date)
+                      }
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          size: "small",
+                          error: !!offerForm.offerActiveEnd.error,
+                          helperText: offerForm.offerActiveEnd.error || "",
+                        },
+                      }}
+                      shouldDisableDate={shouldDisableDate}
+                      sx={{ minWidth: 250, flexGrow: 1 }}
+                    />
+                  </Box>
+                </Card>
+              </Box>
+            </LocalizationProvider>
+
+            <Box sx={{ display: "flex", flexDirection: "column", mt: 3 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  mb: 2,
+                }}
               >
-                {paramOfferID ? "Cancel" : "Clear"}
-              </Button>
-              <LoadingButton
-                variant="contained"
-                color="primary"
-                loading={isSubmitting}
-                onClick={handleSubmit}
-              >
-                {paramOfferID ? "Update Offer" : "Create Offer"}
-              </LoadingButton>
+                <Typography variant="subtitle1" fontWeight={500}>
+                  Timeline Visualization
+                </Typography>
+              </Box>
+
+              <Card variant="outlined" sx={{ borderRadius: 2, p: 2 }}>
+                {events.length > 0 ? (
+                  <Calendar
+                    localizer={localizer}
+                    events={events}
+                    startAccessor="start"
+                    endAccessor="end"
+                    style={{ height: 500 }}
+                    eventPropGetter={eventStyleGetter}
+                    view={calendarView}
+                    views={["month", "week", "day"]}
+                    onView={(view) =>
+                      setCalendarView(view as "month" | "week" | "day")
+                    }
+                  />
+                ) : (
+                  <Box
+                    sx={{
+                      height: 500,
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      backgroundColor: "background.default",
+                      borderRadius: 1,
+                      gap: 2,
+                    }}
+                  >
+                    <EventNoteIcon
+                      sx={{
+                        fontSize: 48,
+                        color: "text.secondary",
+                        opacity: 0.5,
+                      }}
+                    />
+                    <Typography color="text.secondary" textAlign="center">
+                      Select timeline dates above to visualize your tender offer
+                      schedule
+                    </Typography>
+                  </Box>
+                )}
+              </Card>
             </Box>
+          </Box>
+
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mt: 5,
+              pt: 3,
+              borderTop: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={handleCancel}
+              disabled={isSubmitting}
+              startIcon={<DeleteOutlineIcon />}
+            >
+              Clear Form
+            </Button>
+            <LoadingButton
+              variant="contained"
+              color="primary"
+              size="large"
+              loading={isSubmitting}
+              onClick={handleSubmit}
+              sx={{ px: 4 }}
+            >
+              Create Tender Offer
+            </LoadingButton>
           </Box>
         </CardContent>
       </Card>

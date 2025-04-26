@@ -39,8 +39,8 @@ import { UserProps } from "../../types";
 import { useFeedback } from "../../FeedbackAlertContext";
 import { isEmail, isRequired, ValidatorFunction } from "../../util/validators";
 import { matchIsValidTel, MuiTelInput } from "mui-tel-input";
-import { generateWallet, WalletInfo } from "../../util/ethereum";
 import ConfirmationDialog from "../confirmationDialog/ConfirmationDialog";
+import WalletTab from "./WalletTab";
 
 export type EditFormProps = {
   [key: string]: {
@@ -72,6 +72,10 @@ interface MainSettingsProps {
 interface ServerFormError {
   path: string;
   msg: string;
+}
+
+interface WalletProps {
+  private;
 }
 
 const TabPanel = (props: TabPanelProps) => {
@@ -121,19 +125,13 @@ const MainSettings: React.FC<MainSettingsProps> = ({
   const [editPhone, setEditPhone] = useState(false);
 
   const [showPrivateKeyDialog, setShowPrivateKeyDialog] = useState(false);
-  const [tempWallet, setTempWallet] = useState<WalletInfo | null>(null);
   const [walletIsVisible, setWalletIsVisible] = useState(false);
+  const [isSavingWallet, setIsSavingWallet] = useState<boolean>(false);
 
-  const toggleVisibility = () => setWalletIsVisible(!walletIsVisible);
+  const handleSavePublicWallet = async () => {
+    if (isSavingWallet) return;
 
-  const handleCreateWallet = () => {
-    const newWallet: WalletInfo = generateWallet();
-    setTempWallet(newWallet);
-    setShowPrivateKeyDialog(true);
-  };
-
-  const handlePrivateKeyConfirmation = async () => {
-    if (!tempWallet) return;
+    setIsSavingWallet(true);
 
     try {
       const res = await fetch(`${apiUrl}/user/wallet`, {
@@ -160,6 +158,7 @@ const MainSettings: React.FC<MainSettingsProps> = ({
         false
       );
     } finally {
+      setIsSavingWallet(false);
       setTempWallet(null);
       setShowPrivateKeyDialog(false);
     }
@@ -179,7 +178,6 @@ const MainSettings: React.FC<MainSettingsProps> = ({
     setTimeout(() => setIsShake(false), 500);
   }, []);
 
-  // Initialize form values
   useEffect(() => {
     if (user) {
       setEditForm({
@@ -331,7 +329,6 @@ const MainSettings: React.FC<MainSettingsProps> = ({
     }
   };
 
-  // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
@@ -340,7 +337,6 @@ const MainSettings: React.FC<MainSettingsProps> = ({
     });
   };
 
-  // Loading state UI components
   const LoadingHeader = () => (
     <Box
       sx={{
@@ -455,7 +451,6 @@ const MainSettings: React.FC<MainSettingsProps> = ({
     <Box sx={{ width: "100%" }}>
       <Card elevation={3} sx={{ overflow: "visible", borderRadius: 2 }}>
         <CardContent sx={{ p: 0 }}>
-          {/* User Profile Header */}
           <Box
             sx={{
               background: `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
@@ -844,230 +839,10 @@ const MainSettings: React.FC<MainSettingsProps> = ({
 
           {/* Wallet Tab */}
           <TabPanel value={tabValue} index={3}>
-            <Box sx={{ px: 2, pb: 2 }}>
-              <Typography
-                variant="h6"
-                sx={{
-                  mb: 2,
-                  color: theme.palette.primary.main,
-                  fontWeight: 600,
-                }}
-              >
-                Wallet Information
-              </Typography>
-              {publicWalletAddress === "" ? (
-                <Box>
-                  <Card>
-                    <CardContent
-                      sx={{
-                        p: 4,
-                        textAlign: "center",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 4,
-                      }}
-                    >
-                      <AccountBalanceWalletIcon
-                        sx={{
-                          fontSize: 60,
-                          color: theme.palette.primary.main,
-                          opacity: 0.8,
-                        }}
-                      />
-                      <Typography variant="h6" color="text.primary">
-                        You don't have a wallet yet
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ maxWidth: 500, mb: 2 }}
-                      >
-                        Create a wallet to start interacting with our website
-                        securely. Your wallet will be encrypted and accessible
-                        only by you.
-                      </Typography>
-                      <Button
-                        onClick={handleCreateWallet}
-                        variant="contained"
-                        size="large"
-                        startIcon={<AddIcon />}
-                        sx={{
-                          px: 4,
-                          py: 1.5,
-                          borderRadius: 8,
-                          boxShadow: `0 4px 14px 0 ${alpha(
-                            theme.palette.primary.main,
-                            0.3
-                          )}`,
-                        }}
-                      >
-                        Create Wallet
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </Box>
-              ) : (
-                <Box>
-                  <List
-                    sx={{
-                      bgcolor: theme.palette.background.default,
-                      borderRadius: 2,
-                      mb: 2,
-                    }}
-                  >
-                    <ListItem
-                      alignItems="flex-start"
-                      sx={{
-                        display: "flex",
-                        flexDirection: { xs: "column", sm: "row" },
-                        alignItems: { xs: "flex-start", sm: "center" },
-                      }}
-                    >
-                      <ListItemIcon>
-                        <AccountBalanceWalletIcon color="primary" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Your Public Wallet Address"
-                        secondary={
-                          <Box
-                            sx={{
-                              mt: 0.5,
-                              display: "flex",
-                              alignItems: "center",
-                            }}
-                          >
-                            <Card sx={{ p: 0 }}>
-                              <CardContent
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "cetner",
-                                }}
-                              >
-                                <Typography
-                                  component="span"
-                                  variant="body2"
-                                  fontFamily="monospace"
-                                  sx={{
-                                    wordBreak: "break-all",
-                                  }}
-                                >
-                                  {walletIsVisible ? (
-                                    publicWalletAddress
-                                  ) : (
-                                    <>
-                                      {publicWalletAddress.substring(0, 6)}...
-                                      {publicWalletAddress.substring(
-                                        publicWalletAddress.length - 4
-                                      )}
-                                    </>
-                                  )}
-                                </Typography>
-                              </CardContent>
-                            </Card>
-                            <IconButton
-                              onClick={() =>
-                                setWalletIsVisible(!walletIsVisible)
-                              }
-                              color="primary"
-                              size="small"
-                              sx={{ ml: 1 }}
-                              aria-label={
-                                walletIsVisible
-                                  ? "Hide wallet address"
-                                  : "Show wallet address"
-                              }
-                            >
-                              {walletIsVisible ? (
-                                <VisibilityOffIcon />
-                              ) : (
-                                <VisibilityIcon />
-                              )}
-                            </IconButton>
-                          </Box>
-                        }
-                        slotProps={{
-                          primary: {
-                            variant: "subtitle2",
-                            color: "text.secondary",
-                          },
-                        }}
-                      />
-                    </ListItem>
-                  </List>
-                  <Box sx={{ mt: 3 }}>
-                    <Card>
-                      <CardContent sx={{ p: 0 }}>
-                        <List disablePadding>
-                          <ListItem sx={{ display: "flex" }}>
-                            <ListItemIcon>
-                              <SecurityIcon color="warning" />
-                            </ListItemIcon>
-                            <ListItemText
-                              primary="Privacy Warning"
-                              secondary="Never share your public wallet address with anyone. Sharing your wallet address can link your identity to your activity, violating our Terms of Service regarding user privacy."
-                            />
-                          </ListItem>
-                          <Divider component="li" />
-                          <ListItem sx={{ display: "flex" }}>
-                            <ListItemIcon>
-                              <LockIcon color="error" />
-                            </ListItemIcon>
-                            <ListItemText
-                              primary="Security Notice"
-                              secondary="Never share your wallet's private key or seed phrase. Be cautious of phishing attempts and always verify the website URL before connecting your wallet."
-                            />
-                          </ListItem>
-                        </List>
-                      </CardContent>
-                    </Card>
-                  </Box>
-                </Box>
-              )}
-            </Box>
+            <WalletTab publicUserAddress={user.publicWalletAddress} />
           </TabPanel>
         </CardContent>
       </Card>
-
-      <ConfirmationDialog
-        open={showPrivateKeyDialog}
-        onClose={handleClosePrivateKeyDialog}
-        onConfirm={handlePrivateKeyConfirmation}
-        title="Important: Save Your Private Key"
-        confirmButtonText="I've Saved My Private Key"
-        maxWidth={500}
-      >
-        <Typography variant="body2" sx={{ mb: 2 }}>
-          Please store your private key in a secure location. If you lose it,
-          you will lose access to your wallet forever. Never share your private
-          key with anyone.
-        </Typography>
-
-        <Card>
-          <CardContent>
-            <Typography
-              variant="body2"
-              fontFamily="monospace"
-              fontWeight="medium"
-              color="error"
-              sx={{ wordBreak: "break-all" }}
-            >
-              {tempWallet?.privateKey}
-            </Typography>
-          </CardContent>
-        </Card>
-
-        <Typography
-          variant="subtitle2"
-          color="error"
-          sx={{ display: "flex", alignItems: "center", mt: 1 }}
-        >
-          <SecurityIcon sx={{ mr: 1, fontSize: "small" }} />
-          This is the only time we will show you your private key
-        </Typography>
-      </ConfirmationDialog>
     </Box>
   );
 };

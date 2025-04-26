@@ -20,6 +20,7 @@ func SetupRoutes(router *mux.Router) {
 	router.HandleFunc("/user/forgot-password", generalHandler.ForgotPassword).Methods("POST")
 	router.HandleFunc("/user/reset-password", generalHandler.ResetPassword).Methods("PUT")
 	router.HandleFunc("/login", generalHandler.PostLogin).Methods("POST")
+	router.HandleFunc("/sectors", generalHandler.GetSectors).Methods("GET")
 
 	// User routes that require authentication
 	router.HandleFunc("/user/{userID}", auth.RequireRole(userHandler.GetUser)).Methods("GET")
@@ -29,11 +30,15 @@ func SetupRoutes(router *mux.Router) {
 
 	// Admin Routes (require "admin" role)
 	router.HandleFunc("/user/{userID}", auth.RequireRole(adminHandler.PutUser, "admin")).Methods("PUT")
+	router.HandleFunc("/user/{userID}/roles", auth.RequireRole(adminHandler.PostUserRole, "admin")).Methods("POST")
+	router.HandleFunc("/user/{userID}/roles/{roleID}", auth.RequireRole(adminHandler.DeleteUserRole, "admin")).Methods("DELETE")
 	router.HandleFunc("/user", auth.RequireRole(adminHandler.PostUser, "admin")).Methods("POST")
 	router.HandleFunc("/users", auth.RequireRole(adminHandler.GetUsers, "admin")).Methods("GET")
 	router.HandleFunc("/users/{userID}", auth.RequireRole(adminHandler.DeleteUser, "admin")).Methods("DELETE")
 
 	router.HandleFunc("/roles", auth.RequireRole(adminHandler.GetRoles, "admin")).Methods("GET")
+
+	// need to be removed
 	router.HandleFunc("/roles", auth.RequireRole(adminHandler.CreateRole, "admin")).Methods("POST")
 	router.HandleFunc("/roles/{roleName}", auth.RequireRole(adminHandler.UpdateRole, "admin")).Methods("PUT")
 	router.HandleFunc("/roles/{roleName}", auth.RequireRole(adminHandler.DeleteRole, "admin")).Methods("DELETE")

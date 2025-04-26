@@ -38,7 +38,6 @@ import { styled } from "@mui/material/styles";
 import { UserProps } from "../../types";
 import { useNavigate } from "react-router-dom";
 import { Logout } from "@mui/icons-material";
-import { getEthBalance } from "../../util/ethereum";
 
 // Keep your existing MaterialUISwitch styled component...
 const MaterialUISwitch = styled(Switch)(({ theme }) => ({
@@ -153,7 +152,7 @@ const Navbar: React.FC<NavbarProps> = ({
     const fetchEthBalance = async () => {
       if (isAuth && publicWalletAddress) {
         try {
-          const balance = await getEthBalance(publicWalletAddress);
+          const balance = "";
           setEthBalance(balance);
         } catch (error) {
           console.error("Error fetching ETH balance:", error);

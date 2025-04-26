@@ -50,8 +50,9 @@ func (h *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	if search != "" {
 		searchPattern := "%" + search + "%"
 		baseQuery = baseQuery.Where(
-			"username LIKE ? OR email LIKE ? OR phone_number LIKE ?",
-			searchPattern, searchPattern, searchPattern,
+			"last_name LIKE ? OR first_name LIKE ? OR email LIKE ? OR phone_number LIKE ?"+
+				" OR CONCAT(first_name, ' ', last_name) LIKE ?",
+			searchPattern, searchPattern, searchPattern, searchPattern, searchPattern,
 		)
 	}
 
@@ -515,5 +516,140 @@ func (h *AdminHandler) DeleteRole(w http.ResponseWriter, r *http.Request) {
 
 	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
 		"message": "Role deleted successfully",
+	})
+}
+
+// PostUserRole assigns a role to a user.
+func (h *AdminHandler) PostUserRole(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userID"]
+
+	var payload struct {
+		RoleID uint `json:"roleID"`
+	}
+
+	if err := utils.ParseJson(r, &payload); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("bad request failed to parse body"))
+		return
+	}
+
+	if userID == "" {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("userID and roleID are required"))
+		return
+	}
+
+	// Load user
+	var user models.User
+	if err := db.DB.DB.Preload("Roles").First(&user, userID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.WriteError(w, http.StatusNotFound, errors.New("user not found"))
+		} else {
+			utils.WriteError(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	// Load role
+	var role models.Role
+	if err := db.DB.DB.First(&role, payload.RoleID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.WriteError(w, http.StatusNotFound, fmt.Errorf("role %d not found", payload.RoleID))
+		} else {
+			utils.WriteError(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	// Prevent duplicating the same role
+	for _, r := range user.Roles {
+		if r.ID == role.ID {
+			utils.WriteError(w, http.StatusConflict, fmt.Errorf("user already has role %s", role.Name))
+			return
+		}
+	}
+
+	// Assign role in a transaction
+	tx := db.DB.DB.Begin()
+	if err := tx.Model(&user).Association("Roles").Append(&role); err != nil {
+		tx.Rollback()
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to assign role"))
+		return
+	}
+	if err := tx.Commit().Error; err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"message": fmt.Sprintf("role %s assigned to user", role.Name),
+	})
+}
+
+// DeleteUserRole removes a role from a user, ensuring at least one remains.
+func (h *AdminHandler) DeleteUserRole(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["userID"]
+	roleID := vars["roleID"]
+
+	if userID == "" || roleID == "" {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("userID and roleID are required"))
+		return
+	}
+
+	// Load user with roles
+	var user models.User
+	if err := db.DB.DB.Preload("Roles").First(&user, userID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.WriteError(w, http.StatusNotFound, errors.New("user not found"))
+		} else {
+			utils.WriteError(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	// Ensure user won't be left with zero roles
+	if len(user.Roles) <= 1 {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("cannot remove role; user must have at least one role"))
+		return
+	}
+
+	// Load the specific role
+	var role models.Role
+	if err := db.DB.DB.First(&role, roleID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.WriteError(w, http.StatusNotFound, fmt.Errorf("role %s not found", roleID))
+		} else {
+			utils.WriteError(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	// Check the user actually has this role
+	hasRole := false
+	for _, r := range user.Roles {
+		if r.ID == role.ID {
+			hasRole = true
+			break
+		}
+	}
+	if !hasRole {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("user does not have role %s", role.Name))
+		return
+	}
+
+	// Remove the role in a transaction
+	tx := db.DB.DB.Begin()
+	if err := tx.Model(&user).Association("Roles").Delete(&role); err != nil {
+		tx.Rollback()
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to remove role"))
+		return
+	}
+	if err := tx.Commit().Error; err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"message": fmt.Sprintf("role %s removed from user", role.Name),
 	})
 }

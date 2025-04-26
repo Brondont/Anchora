@@ -34,15 +34,19 @@ func ConnectDB() {
 
 	log.Println("Running migrations")
 
-	db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&models.Role{},
 		&models.User{},
-		&models.Contract{},
+		&models.Offer{},
 		&models.ContractRules{},
 		&models.Document{},
+
 		&models.Bid{},
 		&models.ExpertEvaluation{},
-	)
+		&models.Sector{},
+	); err != nil {
+		log.Printf("Migration failed %v", err)
+	}
 	DB = DBInstance{
 		DB: db,
 	}

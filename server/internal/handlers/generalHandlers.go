@@ -331,6 +331,22 @@ func (h *GeneralHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *GeneralHandler) UpdateUserEmail(w http.ResponseWriter, r *http.Request) {
+func (h *GeneralHandler) GetSectors(w http.ResponseWriter, r *http.Request) {
+	var sectors []models.Sector
 
+	result := db.DB.DB.Find(&sectors)
+	if result.Error != nil {
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("server couldn't fetch the sectors"))
+		return
+	}
+
+	if result.RowsAffected == 0 {
+		utils.WriteError(w, http.StatusNotFound, errors.New("no sectors available"))
+		return
+	}
+
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"message": "Sectors fetched successfully",
+		"sectors": sectors,
+	})
 }

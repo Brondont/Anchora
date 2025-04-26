@@ -20,8 +20,8 @@ import {
   ListItemText,
   ListItemIcon,
   Button,
+  CircularProgress,
 } from "@mui/material";
-import { LoadingButton } from "@mui/lab";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
@@ -30,15 +30,16 @@ import {
 } from "@mui/icons-material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useFeedback } from "../../../FeedbackAlertContext";
+import AddCircleIcon from "@mui/icons-material/AddCircle";
 import { Role, UserProps } from "../../../types";
 import ConfirmationDialog from "../../confirmationDialog/ConfirmationDialog";
-import RolesDialog from "./RolesDialog";
+import RolesDialog from "./UserRolesDialog";
 import { useNavigate } from "react-router-dom";
 
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<UserProps[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-  const [selectedUserID, setSelectedUserID] = useState<number>();
+  const [selectedUser, setSelectedUser] = useState<UserProps>();
   const [totalUsers, setTotalUsers] = useState(0);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -68,16 +69,15 @@ const UserManagement: React.FC = () => {
 
   const handleActionsClick = (
     event: React.MouseEvent<HTMLElement>,
-    userID: number
+    user: UserProps
   ) => {
     setActionsAnchorEl(event.currentTarget);
-    setSelectedUserID(userID);
+    setSelectedUser(user);
   };
+
   const handleActionsClose = () => {
     setActionsAnchorEl(null);
   };
-
-  const handleRolesChange = (updatedRoles: Role[]) => {};
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -227,15 +227,6 @@ const UserManagement: React.FC = () => {
               >
                 Add User
               </Button>
-              <LoadingButton
-                variant="outlined"
-                onClick={() => {
-                  setOpenRolesDialog(true);
-                }}
-                loading={isProcessing}
-              >
-                Manage Roles
-              </LoadingButton>
             </Box>
           </Box>
 
@@ -285,7 +276,7 @@ const UserManagement: React.FC = () => {
                         aria-expanded={isActionsOpen ? "true" : undefined}
                         aria-haspopup="true"
                         onClick={(event) => {
-                          handleActionsClick(event, user.ID);
+                          handleActionsClick(event, user);
                         }}
                       >
                         <MoreVertIcon />
@@ -335,35 +326,53 @@ const UserManagement: React.FC = () => {
             slotProps={{
               paper: {
                 style: {
-                  maxHeight: 100,
+                  maxHeight: 120,
+                  overflowY: "scroll",
                   width: "20ch",
                 },
               },
             }}
           >
-            <MenuItem
-              onClick={() => {
-                navigate(`/admin/user-details?userID=${selectedUserID}`);
-              }}
-              key={`edit-${selectedUserID}`}
-            >
-              <ListItemIcon>
-                <EditIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Edit Details</ListItemText>
-            </MenuItem>
-            <MenuItem
-              key={`delete-${selectedUserID}`}
-              onClick={() => {
-                handleDeleteClick(selectedUserID);
-                handleActionsClose();
-              }}
-            >
-              <ListItemIcon>
-                <DeleteIcon color="error" fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Delete User</ListItemText>
-            </MenuItem>
+            {selectedUser ? (
+              <>
+                <MenuItem
+                  onClick={() => {
+                    navigate(`/admin/user-details?userID=${selectedUser.ID}`);
+                  }}
+                  key={`edit-${selectedUser.ID}`}
+                >
+                  <ListItemIcon>
+                    <EditIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>Edit Details</ListItemText>
+                </MenuItem>
+                <MenuItem
+                  key={`roles-${selectedUser.ID}`}
+                  onClick={() => {
+                    setOpenRolesDialog(true);
+                  }}
+                >
+                  <ListItemIcon>
+                    <AddCircleIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>Manage Roles</ListItemText>
+                </MenuItem>
+                <MenuItem
+                  key={`delete-${selectedUser.ID}`}
+                  onClick={() => {
+                    handleDeleteClick(selectedUser.ID);
+                    handleActionsClose();
+                  }}
+                >
+                  <ListItemIcon>
+                    <DeleteIcon color="error" fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>Delete User</ListItemText>
+                </MenuItem>
+              </>
+            ) : (
+              <CircularProgress />
+            )}
           </Menu>
         </CardContent>
       </Card>
@@ -380,8 +389,9 @@ const UserManagement: React.FC = () => {
 
       <RolesDialog
         open={openRolesDialog}
+        onRoleChange={fetchUsers}
         onClose={() => setOpenRolesDialog(false)}
-        onRolesChange={handleRolesChange}
+        user={selectedUser}
       />
     </Box>
   );

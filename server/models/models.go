@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// Role and User models remain largely unchanged.
 type Role struct {
 	gorm.Model
 	Name  string `json:"name" gorm:"type:varchar(50);unique;not null"`
@@ -19,13 +20,13 @@ type User struct {
 	Email               string     `json:"email" gorm:"type:varchar(100);not null;unique"`
 	Password            string     `json:"password" gorm:"type:text;not null"`
 	PhoneNumber         string     `json:"phoneNumber" gorm:"type:varchar(100)"`
-	Reputation          float64    `json:"reputation" gorm:"default:0"`
 	Roles               []Role     `gorm:"many2many:user_roles;"`
 	Certificates        []Document `gorm:"polymorphic:Documentable;"`
 	IsActive            bool       `json:"isActive" gorm:"default:false"`
 	PublicWalletAddress string     `json:"publicWalletAddress" gorm:"unique"`
 }
 
+// Bid and ExpertEvaluation models remain unchanged.
 type Bid struct {
 	gorm.Model
 	ContractID  uint      `json:"contractID" gorm:"not null"`
@@ -47,22 +48,36 @@ type ExpertEvaluation struct {
 
 type Offer struct {
 	gorm.Model
-	Title                   string     `json:"title" gorm:"type:varchar(200);not null"`
-	Description             string     `json:"description" gorm:"type:text;not null"`
-	CreatedBy               uint       `json:"createdBy" gorm:"not null"`
-	Documents               []Document `json:"documents" gorm:"polymorphic:Documentable;"`
-	Budget                  float64    `json:"budget" gorm:"not null"`
-	Currency                string     `json:"currency" gorm:"type:varchar(10);not null"`
-	Category                string     `json:"category" gorm:"type:varchar(100)"`
-	Sectors                 []Sector   `json:"sectors" gorm:"many2many:offer_sectors;"`
-	QualificationRequired   string     `json:"qualificationRequired" gorm:"type:text"`
-	Location                string     `json:"location" gorm:"type:varchar(255)"`
-	ProposalSubmissionStart time.Time  `json:"proposalSubmissionStart" gorm:"type:timestamp"`
-	ProposalSubmissionEnd   time.Time  `json:"proposalSubmissionEnd" gorm:"type:timestamp"`
-	BidDeadline             time.Time  `json:"bidDeadline" gorm:"type:timestamp"`
-	OfferValidityEnd        time.Time  `json:"offerValidityEnd" gorm:"type:timestamp"`
-	Status                  string     `json:"status" gorm:"type:varchar(50);default:'open'"`
-	WinningBidID            uint       `json:"winningBidID"`
+	// Basic offer details
+	TenderReference         string `json:"tenderReference" gorm:"type:varchar(100);unique;not null"`
+	Title                   string `json:"title" gorm:"type:varchar(200);not null"`
+	Summary                 string `json:"summary" gorm:"type:text;not null"`
+	TechnicalSpecifications string `json:"technicalSpecifications" gorm:"type:text;not null"`
+
+	// Categorization & classification
+	CPVCode  string `json:"cpvCode" gorm:"type:varchar(50)"`
+	Sector   Sector `json:"sector"`
+	SectorID uint   `json:"sectorID"`
+
+	// Financial and contractual details
+	Budget                float64 `json:"budget" gorm:"not null"`
+	QualificationRequired string  `json:"qualificationRequired" gorm:"type:text"`
+	ContractDuration      string  `json:"contractDuration" gorm:"type:varchar(100)"`
+
+	// Timeline Fields
+	OfferActiveStart        time.Time `json:"offerActiveStart" gorm:"type:timestamp;not null"`
+	ProposalSubmissionStart time.Time `json:"proposalSubmissionStart" gorm:"type:timestamp;not null"`
+	ProposalSubmissionEnd   time.Time `json:"proposalSubmissionEnd" gorm:"type:timestamp;not null"`
+	ProposalReviewEnd       time.Time `json:"proposalReviewEnd" gorm:"type:timestamp;not null"`
+	OfferActiveEnd          time.Time `json:"offerActiveEnd" gorm:"type:timestamp;not null"`
+
+	// Management of offer state
+	Status       string `json:"status" gorm:"type:varchar(50);default:'open'"`
+	WinningBidID uint   `json:"winningBidID"`
+	CreatedBy    uint   `json:"createdBy" gorm:"not null"`
+
+	// Documents automatically related to this offer
+	Documents []Document `json:"documents" gorm:"polymorphic:Documentable;"`
 }
 
 type Sector struct {
@@ -71,6 +86,7 @@ type Sector struct {
 	Description string `json:"description" gorm:"type:text"`
 }
 
+// A simplified association model that can be linked to offers
 type ContractRules struct {
 	gorm.Model
 	Name        string  `json:"name" gorm:"type:varchar(100);not null;unique"`
@@ -80,8 +96,8 @@ type ContractRules struct {
 
 type Document struct {
 	gorm.Model
-	Name             string `json:"name" gorm:"type:varchar(255);not null"`
-	URL              string `json:"url" gorm:"type:text;not null"`
-	DocumentableID   uint   `json:"documentableID"`
-	DocumentableType string `json:"documentableType"`
+	DocumentType     string `json:"documentType" gorm:"type:varchar(50);not null"`
+	DocumentPath     string `json:"documentPath" gorm:"type:text;not null"`
+	DocumentableID   uint   `json:"documentableID"`   // ID of the related model record
+	DocumentableType string `json:"documentableType"` // Type of the related model (e.g., "Offer", "Bid", "User")
 }

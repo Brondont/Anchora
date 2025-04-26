@@ -12,10 +12,11 @@ interface ConfirmationDialogProps {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  onConfirmLoading?: boolean;
   title: string;
   message?: string;
   children?: ReactNode;
-  confirmButtonText: string;
+  confirmButtonText?: string;
   cancelButtonText?: string;
   maxWidth?: string | number;
 }
@@ -24,6 +25,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   open,
   onClose,
   onConfirm,
+  onConfirmLoading,
   title = "Confirm Action",
   message,
   children,
@@ -64,6 +66,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
           color="primary"
           variant="contained"
           sx={{ borderRadius: 2, textTransform: "none" }}
+          loading={onConfirmLoading}
         >
           {confirmButtonText}
         </Button>

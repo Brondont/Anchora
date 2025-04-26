@@ -7,8 +7,11 @@ import (
 	"strings"
 
 	"github.com/Brondont/trust-api/config"
+	"github.com/Brondont/trust-api/db"
+	"github.com/Brondont/trust-api/models"
 	"github.com/Brondont/trust-api/utils"
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
 // ValidateAuthToken parses and validates an authentication JWT token, returning AuthClaims.
@@ -27,7 +30,6 @@ func ValidateAuthToken(r *http.Request) (*AuthClaims, error) {
 
 	// Parse the token into AuthClaims
 	token, err := jwt.ParseWithClaims(tokenString, &AuthClaims{}, func(token *jwt.Token) (interface{}, error) {
-		// Ensure the signing method is HMAC
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
 		}
@@ -42,14 +44,40 @@ func ValidateAuthToken(r *http.Request) (*AuthClaims, error) {
 		return nil, errors.New("unable to extract JWT claims")
 	}
 
-	// Ensure token type is "auth"
 	if claims.TokenType != "auth" {
 		return nil, errors.New("invalid token type")
 	}
 
-	// Check if the user's account is active
-	if !claims.IsActive {
+	// Validate user existence and current state
+	var user models.User
+	err = db.DB.DB.Preload("Roles").Where("id = ?", claims.UserID).First(&user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("user not found")
+		}
+		return nil, errors.New("failed to validate user")
+	}
+
+	if !user.IsActive {
 		return nil, errors.New("account is not active")
+	}
+
+	// Validate roles consistency
+	currentRoles := make(map[string]struct{}, len(user.Roles))
+	for _, role := range user.Roles {
+		currentRoles[role.Name] = struct{}{}
+	}
+
+	// Quick length check first for performance
+	if len(currentRoles) != len(claims.Roles) {
+		return nil, errors.New("user roles mismatch")
+	}
+
+	// Detailed role check
+	for _, claimedRole := range claims.Roles {
+		if _, ok := currentRoles[claimedRole]; !ok {
+			return nil, errors.New("user roles mismatch")
+		}
 	}
 
 	return claims, nil

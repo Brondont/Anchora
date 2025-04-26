@@ -100,6 +100,7 @@ const TransactionTestPage: React.FC = () => {
   useEffect(() => {
     const fetchBalances = async () => {
       if (!provider) return;
+      setIsLoading(true);
 
       try {
         if (senderAddress) {
@@ -113,6 +114,8 @@ const TransactionTestPage: React.FC = () => {
         }
       } catch (error) {
         console.error("Error fetching balances:", error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -379,6 +382,12 @@ const TransactionTestPage: React.FC = () => {
           </Card>
         </Grid>
       </Grid>
+      <TextField
+        placeholder="factory address"
+        onChange={(e) => {
+          localStorage.setItem("factoryAddress", e.target.value);
+        }}
+      />
     </Box>
   );
 };

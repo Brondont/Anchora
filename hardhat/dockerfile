@@ -12,5 +12,6 @@ COPY . .
 # Expose Hardhat's default RPC port
 EXPOSE 8545
 
-# Start Hardhat's local node when the container runs
+# Start Hardhat node with persistent data directory
 CMD ["npx", "hardhat", "node"]
+

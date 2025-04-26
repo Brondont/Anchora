@@ -16,8 +16,6 @@ import EditIcon from "@mui/icons-material/Edit";
 import PeopleIcon from "@mui/icons-material/People";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import AdminUserEdit from "../../components/admin/user/AdminUserEdit";
-import HandshakeIcon from "@mui/icons-material/Handshake";
-import ContractCreation from "../../components/contracts/ContractsCreation";
 
 interface AdminSpaceProps {
   handleLogout: () => void;
@@ -26,7 +24,6 @@ interface AdminSpaceProps {
 
 const SideBarSections: Section[] = [
   { name: "Dashboard", path: "dashboard", icon: <DashboardIcon /> },
-  { name: "Contracts", path: "contracts", icon: <HandshakeIcon /> },
   {
     name: "Users Managment",
     path: "users-managment",
@@ -79,7 +76,6 @@ const AdminSpace: React.FC<AdminSpaceProps> = ({ handleLogout, user }) => {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="user-details" element={<AdminUserEdit />} />
-          <Route path="contracts" element={<ContractCreation />} />
           <Route path="*" element={<Navigate to="/admin/dashboard" />} />
         </Routes>
       </Box>

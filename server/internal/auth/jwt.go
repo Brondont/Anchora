@@ -20,7 +20,6 @@ const (
 type AuthClaims struct {
 	UserID    string   `json:"userID"`
 	Roles     []string `json:"roles"`
-	IsActive  bool     `json:"isActive"`
 	TokenType string   `json:"type"`
 	jwt.RegisteredClaims
 }
@@ -51,7 +50,6 @@ func CreateAuthToken(userID uint, roles []models.Role, isActive bool) (string, e
 	claims := AuthClaims{
 		UserID:    strconv.FormatUint(uint64(userID), 10),
 		Roles:     roleNames,
-		IsActive:  isActive,
 		TokenType: "auth",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TokenExpirationTime)),
