@@ -7,18 +7,12 @@ import {
   TextField,
   Skeleton,
   Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  OutlinedInput,
-  SelectChangeEvent,
   keyframes,
 } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
 import { matchIsValidTel, MuiTelInput } from "mui-tel-input";
-import { UserProps, Role, ServerFormError } from "../../../types";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { UserProps, ServerFormError } from "../../../types";
+import { useSearchParams } from "react-router-dom";
 import { useFeedback } from "../../../FeedbackAlertContext";
 import {
   isEmail,
@@ -65,33 +59,16 @@ const AdminUserForm: React.FC = () => {
     firstName: { value: "", error: "", validators: [isRequired] },
     lastName: { value: "", error: "", validators: [isRequired] },
     phoneNumber: { value: "", error: "", validators: [isRequired] },
-    rolesIDs: { value: [], error: "", validators: [isRequired] },
   });
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [paramUserID, setParamUserID] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isShake, setIsShake] = useState<boolean>(false);
-  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
 
   const apiUrl = import.meta.env.VITE_API_URL;
   const token = localStorage.getItem("token");
   const { showFeedback } = useFeedback();
-
-  const fetchRoles = useCallback(async () => {
-    try {
-      const res = await fetch(`${apiUrl}/roles`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (data.error) throw data.error;
-      setAvailableRoles(data.roles);
-    } catch (err: any) {
-      showFeedback(err.msg || "Failed to fetch roles", false);
-    }
-  }, [apiUrl, token, showFeedback]);
 
   const fetchUser = useCallback(
     async (userID: string) => {
@@ -119,14 +96,13 @@ const AdminUserForm: React.FC = () => {
   );
 
   useEffect(() => {
-    fetchRoles();
     // get param from url
     const userID = searchParams.get("userID");
     if (!userID) return;
     setParamUserID(userID);
 
     fetchUser(userID);
-  }, [fetchUser, fetchRoles, searchParams]);
+  }, [fetchUser, searchParams]);
 
   const inputChangeHandler = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -174,33 +150,6 @@ const AdminUserForm: React.FC = () => {
     }));
   };
 
-  const handleRolesChange = (event: SelectChangeEvent<string[]>) => {
-    const selectedRoleIDs = event.target.value as string[];
-
-    setEditedUserForm((prev) => {
-      // Check if roles are selected
-      let error = "";
-      if (prev.rolesIDs.validators) {
-        for (const validator of prev.rolesIDs.validators) {
-          const result = validator(selectedRoleIDs);
-          if (!result.isValid) {
-            error = result.errorMessage;
-            break;
-          }
-        }
-      }
-
-      return {
-        ...prev,
-        rolesIDs: {
-          ...prev.rolesIDs,
-          value: selectedRoleIDs,
-          error: error,
-        },
-      };
-    });
-  };
-
   const shakeFields = useCallback(() => {
     setIsShake(true);
     setTimeout(() => setIsShake(false), 500);
@@ -215,7 +164,6 @@ const AdminUserForm: React.FC = () => {
         firstName: "",
         lastName: "",
         phoneNumber: "",
-        Roles: [],
         CreatedAt: "",
         UpdatedAt: "",
       } as UserProps);
@@ -225,9 +173,6 @@ const AdminUserForm: React.FC = () => {
   };
 
   const updateEditUser = (user: UserProps) => {
-    // Extract role IDs from user.Roles
-    const roleIDs = user.Roles ? user.Roles.map((role) => String(role.ID)) : [];
-
     setEditedUserForm({
       email: {
         value: user.email,
@@ -246,11 +191,6 @@ const AdminUserForm: React.FC = () => {
       },
       phoneNumber: {
         value: user.phoneNumber,
-        error: "",
-        validators: [isRequired],
-      },
-      rolesIDs: {
-        value: roleIDs,
         error: "",
         validators: [isRequired],
       },
@@ -279,16 +219,6 @@ const AdminUserForm: React.FC = () => {
         }
       }
     });
-
-    // Specific validation for roles (check if any role is selected)
-    const selectedRoleIDs = updatedForm.rolesIDs.value as string[];
-    if (selectedRoleIDs.length === 0) {
-      updatedForm.rolesIDs = {
-        ...updatedForm.rolesIDs,
-        error: "At least one role is required",
-      };
-      isValid = false;
-    }
 
     // Shake fields if validation failed
     if (!isValid) {
@@ -325,7 +255,6 @@ const AdminUserForm: React.FC = () => {
           lastName: editedUserForm.lastName.value,
           email: editedUserForm.email.value,
           phoneNumber: editedUserForm.phoneNumber.value,
-          rolesIDs: editedUserForm.rolesIDs.value, // Send just the role IDs
         }),
       });
 
@@ -499,40 +428,6 @@ const AdminUserForm: React.FC = () => {
                 name="phone"
                 required
               />
-              <FormControl
-                fullWidth
-                error={editedUserForm.rolesIDs.error !== ""}
-                sx={{
-                  ...(isShake && editedUserForm.rolesIDs.error !== ""
-                    ? { animation: `${shakeAnimation} 0.35s` }
-                    : {}),
-                }}
-              >
-                <InputLabel id="roles-label">Roles</InputLabel>
-                <Select
-                  labelId="roles-label"
-                  multiple
-                  value={editedUserForm.rolesIDs.value as string[]}
-                  onChange={handleRolesChange}
-                  input={<OutlinedInput label="Roles" />}
-                  required
-                >
-                  {availableRoles.map((role) => (
-                    <MenuItem key={role.ID} value={String(role.ID)}>
-                      {role.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-                {editedUserForm.rolesIDs.error && (
-                  <Typography
-                    color="error"
-                    variant="caption"
-                    sx={{ ml: 2, mt: 0.5 }}
-                  >
-                    {editedUserForm.rolesIDs.error}
-                  </Typography>
-                )}
-              </FormControl>
             </Box>
           </Box>
 

@@ -21,6 +21,8 @@ import {
   Avatar,
   MenuItem,
   Tooltip,
+  Alert,
+  Collapse,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import LoginIcon from "@mui/icons-material/Login";
@@ -33,11 +35,15 @@ import CloseIcon from "@mui/icons-material/Close";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import SettingsIcon from "@mui/icons-material/Settings";
 import PublicIcon from "@mui/icons-material/Public";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import { useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { UserProps } from "../../types";
 import { useNavigate } from "react-router-dom";
 import { Logout } from "@mui/icons-material";
+import { useEthers } from "@usedapp/core";
 
 // Keep your existing MaterialUISwitch styled component...
 const MaterialUISwitch = styled(Switch)(({ theme }) => ({
@@ -127,13 +133,62 @@ const Navbar: React.FC<NavbarProps> = ({
   const [searchDrawerOpen, setSearchDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [showNetworkWarning, setShowNetworkWarning] = useState(false);
   const userSettingsOpen = Boolean(anchorEl);
   const navbarRef = useRef<HTMLDivElement | null>(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const navigate = useNavigate();
-  const [ethBalance, setEthBalance] = useState<string>("0.0");
-  const publicWalletAddress = localStorage.getItem("publicWalletAddress");
+  const { account, chainId, switchNetwork } = useEthers();
+
+  const chainID = parseInt(import.meta.env.VITE_ETH_NETWORK_CHAINID, 10);
+  const rpcURL = import.meta.env.VITE_ETH_NETWORK;
+
+  const HARDHAT_NETWORK_PARAMS = {
+    chainId: `0x${chainID.toString(16)}`,
+    chainName: "Hardhat Local Network",
+    nativeCurrency: {
+      name: "Ethereum",
+      symbol: "ETH",
+      decimals: 18,
+    },
+    rpcUrls: [rpcURL],
+    blockExplorerUrls: [],
+  };
+
+  // Check if user is on the wrong network
+  useEffect(() => {
+    if (account && chainId !== chainID) {
+      setShowNetworkWarning(true);
+    } else {
+      setShowNetworkWarning(false);
+    }
+  }, [account, chainId]);
+
+  const handleSwitchNetwork = async () => {
+    try {
+      // First try to just switch to the network if already added
+      await switchNetwork(chainID);
+    } catch (error) {
+      // If switching fails, try to add the network first
+      if (window.ethereum) {
+        try {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [HARDHAT_NETWORK_PARAMS],
+          });
+        } catch (addError) {
+          console.error("Error adding Hardhat network to MetaMask:", addError);
+        }
+      } else {
+        console.error("MetaMask is not installed");
+      }
+    }
+  };
+
+  const handleRedirectToSettings = () => {
+    navigate("/account/settings");
+  };
 
   const handleClickUserSettings = (
     event: React.MouseEvent<HTMLButtonElement>
@@ -146,24 +201,6 @@ const Navbar: React.FC<NavbarProps> = ({
 
   // for updating the icon fo log in after the user logs in
   useEffect(() => {}, [isAuth]);
-
-  // for fetching the balance
-  useEffect(() => {
-    const fetchEthBalance = async () => {
-      if (isAuth && publicWalletAddress) {
-        try {
-          const balance = "";
-          setEthBalance(balance);
-        } catch (error) {
-          console.error("Error fetching ETH balance:", error);
-          setEthBalance("0.00");
-        }
-      }
-    };
-
-    fetchEthBalance();
-    // Re-fetch when user changes or auth status changes
-  }, [isAuth, publicWalletAddress]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -204,6 +241,59 @@ const Navbar: React.FC<NavbarProps> = ({
     ></Box>
   );
 
+  const renderNetworkWarning = () => (
+    <Collapse in={showNetworkWarning}>
+      <Alert
+        severity="warning"
+        icon={<ErrorOutlineIcon />}
+        action={
+          <Button
+            color="inherit"
+            size="small"
+            startIcon={<SwapHorizIcon />}
+            onClick={handleSwitchNetwork}
+          >
+            Switch
+          </Button>
+        }
+        sx={{
+          borderRadius: 0,
+          width: "100%",
+        }}
+      >
+        You are connected to the wrong network. Please switch to our used
+        network.
+      </Alert>
+    </Collapse>
+  );
+
+  // Render inline wallet warning when not in WalletWarning component
+  const renderWalletWarning = () => (
+    <Collapse in={isAuth && !account}>
+      <Alert
+        severity="warning"
+        icon={<ErrorOutlineIcon />}
+        action={
+          <Button
+            color="inherit"
+            size="small"
+            startIcon={<AccountBalanceWalletIcon />}
+            onClick={handleRedirectToSettings}
+          >
+            Connect
+          </Button>
+        }
+        sx={{
+          borderRadius: 0,
+          width: "100%",
+        }}
+      >
+        You don't have a wallet connected. Please connect a wallet in your
+        account settings.
+      </Alert>
+    </Collapse>
+  );
+
   const renderMobileDrawer = () => (
     <Drawer
       anchor="left"
@@ -234,6 +324,44 @@ const Navbar: React.FC<NavbarProps> = ({
         </Box>
         <Divider />
       </Box>
+
+      {account && showNetworkWarning && (
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Alert
+            severity="warning"
+            action={
+              <Button
+                color="inherit"
+                size="small"
+                onClick={handleSwitchNetwork}
+              >
+                Switch
+              </Button>
+            }
+          >
+            Wrong network. Switch to Hardhat.
+          </Alert>
+        </Box>
+      )}
+
+      {isAuth && !account && (
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Alert
+            severity="warning"
+            action={
+              <Button
+                color="inherit"
+                size="small"
+                onClick={handleRedirectToSettings}
+              >
+                Connect
+              </Button>
+            }
+          >
+            No wallet connected. Connect wallet.
+          </Alert>
+        </Box>
+      )}
 
       <List>
         {isAuth ? (
@@ -322,174 +450,221 @@ const Navbar: React.FC<NavbarProps> = ({
   );
 
   const renderDesktopNavbar = () => (
-    <Toolbar
-      sx={{
-        display: { xs: "none", md: "flex" },
-        justifyContent: "space-between",
-        backgroundColor: theme.palette.background.default,
-        p: "6px",
-        px: { md: 4, lg: 4 },
-      }}
-    >
-      <Box
+    <>
+      {renderNetworkWarning()}
+      {renderWalletWarning()}
+      <Toolbar
         sx={{
-          textAlign: "left",
-          color: isDarkMode ? theme.palette.primary.contrastText : "black",
+          display: { xs: "none", md: "flex" },
+          justifyContent: "space-between",
+          backgroundColor: theme.palette.background.default,
+          p: "6px",
+          px: { md: 4, lg: 4 },
         }}
-        component={Link}
-        href="/"
-        underline="none"
       >
-        <Box display="flex">
-          <Typography color="primary" variant="h5" sx={{ fontWeight: "bold" }}>
-            Trust
-          </Typography>
-        </Box>
-      </Box>
-
-      <Box sx={{ display: "flex", width: "50%" }}>
-        <form onSubmit={handleSearchSubmit} style={{ width: "100%" }}>
-          <Box sx={{ display: "flex", gap: 2 }}>
-            <TextField
-              size="small"
-              label="Search Contracts"
-              variant="outlined"
-              fullWidth
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-              }}
-            />
-          </Box>
-        </form>
-        <IconButton>
-          <SearchIcon />
-        </IconButton>
-      </Box>
-
-      <Box sx={{ display: "flex", alignItems: "center" }}>
-        {isAuth ? (
-          <>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
+        <Box
+          sx={{
+            textAlign: "left",
+            color: isDarkMode ? theme.palette.primary.contrastText : "black",
+          }}
+          component={Link}
+          href="/"
+          underline="none"
+        >
+          <Box display="flex">
+            <Typography
+              color="primary"
+              variant="h5"
+              sx={{ fontWeight: "bold" }}
             >
-              <Button href="/transactions" variant="text">
-                {ethBalance} ETH
-              </Button>
-              <Tooltip title="Account settings">
-                <IconButton
-                  onClick={handleClickUserSettings}
-                  size="small"
-                  sx={{ ml: 2 }}
-                  aria-controls={userSettingsOpen ? "account-menu" : undefined}
-                  aria-haspopup="true"
-                  aria-expanded={userSettingsOpen ? "true" : undefined}
-                >
-                  <Avatar color="primary" sx={{ width: 32, height: 32 }} />
-                </IconButton>
-              </Tooltip>
+              Trust
+            </Typography>
+          </Box>
+        </Box>
+
+        <Box sx={{ display: "flex", width: "50%" }}>
+          <form onSubmit={handleSearchSubmit} style={{ width: "100%" }}>
+            <Box sx={{ display: "flex", gap: 2 }}>
+              <TextField
+                size="small"
+                label="Search Contracts"
+                variant="outlined"
+                fullWidth
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                }}
+              />
             </Box>
-            <Menu
-              anchorEl={anchorEl}
-              id="account-menu"
-              open={userSettingsOpen}
-              onClose={handleCloseUserSettings}
-              onClick={handleCloseUserSettings}
-              slotProps={{
-                paper: {
-                  elevation: 0,
-                  sx: {
-                    overflow: "visible",
-                    mt: 1.5,
-                    "& .MuiAvatar-root": {
-                      width: 32,
-                      height: 32,
-                      ml: -0.5,
-                      mr: 1,
-                    },
-                    "&::before": {
-                      content: '""',
-                      display: "block",
-                      position: "absolute",
-                      top: 0,
-                      right: 14,
-                      width: 10,
-                      height: 10,
-                      bgcolor: "background.paper",
-                      transform: "translateY(-50%) rotate(45deg)",
-                      zIndex: 0,
+          </form>
+          <IconButton>
+            <SearchIcon />
+          </IconButton>
+        </Box>
+
+        <Box sx={{ display: "flex", alignItems: "center" }}>
+          {isAuth ? (
+            <>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                {account ? (
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        mr: 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      {`${account.substring(0, 6)}...${account.substring(
+                        account.length - 4
+                      )}`}
+                    </Typography>
+                    {showNetworkWarning && (
+                      <Tooltip title="Wrong network. Click to switch to Hardhat">
+                        <IconButton
+                          color="warning"
+                          size="small"
+                          onClick={handleSwitchNetwork}
+                        >
+                          <ErrorOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
+                ) : (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<AccountBalanceWalletIcon />}
+                    onClick={handleRedirectToSettings}
+                    sx={{ mr: 2 }}
+                  >
+                    Connect Wallet
+                  </Button>
+                )}
+                <Button href="/transactions" variant="text">
+                  ETH
+                </Button>
+                <Tooltip title="Account settings">
+                  <IconButton
+                    onClick={handleClickUserSettings}
+                    size="small"
+                    sx={{ ml: 2 }}
+                    aria-controls={
+                      userSettingsOpen ? "account-menu" : undefined
+                    }
+                    aria-haspopup="true"
+                    aria-expanded={userSettingsOpen ? "true" : undefined}
+                  >
+                    <Avatar color="primary" sx={{ width: 32, height: 32 }} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Menu
+                anchorEl={anchorEl}
+                id="account-menu"
+                open={userSettingsOpen}
+                onClose={handleCloseUserSettings}
+                onClick={handleCloseUserSettings}
+                slotProps={{
+                  paper: {
+                    elevation: 0,
+                    sx: {
+                      overflow: "visible",
+                      mt: 1.5,
+                      "& .MuiAvatar-root": {
+                        width: 32,
+                        height: 32,
+                        ml: -0.5,
+                        mr: 1,
+                      },
+                      "&::before": {
+                        content: '""',
+                        display: "block",
+                        position: "absolute",
+                        top: 0,
+                        right: 14,
+                        width: 10,
+                        height: 10,
+                        bgcolor: "background.paper",
+                        transform: "translateY(-50%) rotate(45deg)",
+                        zIndex: 0,
+                      },
                     },
                   },
-                },
-              }}
-              transformOrigin={{ horizontal: "right", vertical: "top" }}
-              anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
-            >
-              <MenuItem
-                onClick={() => {
-                  navigate(`/profile/${user.ID}`);
-                  handleCloseUserSettings();
                 }}
+                transformOrigin={{ horizontal: "right", vertical: "top" }}
+                anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
               >
-                <ListItemIcon>
-                  <PublicIcon color="primary" />
-                </ListItemIcon>
-                Profile
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  navigate(`/account/settings`);
-                  handleCloseUserSettings();
-                }}
-              >
-                <ListItemIcon>
-                  <SettingsIcon color="primary" />
-                </ListItemIcon>
-                My Account
-              </MenuItem>
-              {
                 <MenuItem
                   onClick={() => {
-                    navigate(`/admin`);
+                    navigate(`/profile/${user.ID}`);
                     handleCloseUserSettings();
                   }}
                 >
                   <ListItemIcon>
-                    <AdminPanelSettingsIcon color="error" />
+                    <PublicIcon color="primary" />
                   </ListItemIcon>
-                  Admin Space
+                  Profile
                 </MenuItem>
-              }
-              <Divider />
-              <MenuItem
-                onClick={() => {
-                  handleCloseUserSettings();
-                  handleLogout();
-                }}
-              >
-                <ListItemIcon>
-                  <Logout color="error" fontSize="small" />
-                </ListItemIcon>
-                Logout
-              </MenuItem>
-            </Menu>
-          </>
-        ) : (
-          <Button variant="contained" href="/login" size="small">
-            Log in
-          </Button>
-        )}
-        <MaterialUISwitch
-          sx={{ m: 1 }}
-          checked={isDarkMode}
-          onChange={toggleDarkMode}
-        />
-      </Box>
-    </Toolbar>
+                <MenuItem
+                  onClick={() => {
+                    navigate(`/account/settings`);
+                    handleCloseUserSettings();
+                  }}
+                >
+                  <ListItemIcon>
+                    <SettingsIcon color="primary" />
+                  </ListItemIcon>
+                  My Account
+                </MenuItem>
+                {user.Roles.some((role) => role.name === "admin") && (
+                  <MenuItem
+                    onClick={() => {
+                      navigate(`/admin`);
+                      handleCloseUserSettings();
+                    }}
+                  >
+                    <ListItemIcon>
+                      <AdminPanelSettingsIcon color="error" />
+                    </ListItemIcon>
+                    Admin Space
+                  </MenuItem>
+                )}
+                <Divider />
+                <MenuItem
+                  onClick={() => {
+                    handleCloseUserSettings();
+                    handleLogout();
+                  }}
+                >
+                  <ListItemIcon>
+                    <Logout color="error" fontSize="small" />
+                  </ListItemIcon>
+                  Logout
+                </MenuItem>
+              </Menu>
+            </>
+          ) : (
+            <Button variant="contained" href="/login" size="small">
+              Log in
+            </Button>
+          )}
+          <MaterialUISwitch
+            sx={{ m: 1 }}
+            checked={isDarkMode}
+            onChange={toggleDarkMode}
+          />
+        </Box>
+      </Toolbar>
+    </>
   );
 
   return (
@@ -510,43 +685,65 @@ const Navbar: React.FC<NavbarProps> = ({
         <AppBar position="static" elevation={0}>
           {renderDesktopTopBar()}
           {isMobile ? (
-            <Toolbar
-              sx={{
-                justifyContent: "space-between",
-                background: theme.palette.background.default,
-                color: isDarkMode
-                  ? theme.palette.primary.contrastText
-                  : "black",
-                minHeight: { xs: 56, sm: 64 },
-              }}
-            >
-              <Box
+            <>
+              {renderNetworkWarning()}
+              {renderWalletWarning()}
+              <Toolbar
                 sx={{
-                  display: "flex",
                   justifyContent: "space-between",
-                  width: "100%",
-                  alignItems: "center",
+                  background: theme.palette.background.default,
+                  color: isDarkMode
+                    ? theme.palette.primary.contrastText
+                    : "black",
+                  minHeight: { xs: 56, sm: 64 },
                 }}
               >
-                <Link href="/" underline="none" color="inherit">
-                  <Typography
-                    variant="h6"
-                    color="primary"
-                    sx={{ fontWeight: "bold" }}
-                  >
-                    Trust
-                  </Typography>
-                </Link>
-                <IconButton
-                  edge="start"
-                  color="inherit"
-                  onClick={() => setMobileMenuOpen(true)}
-                  sx={{ mr: 1 }}
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    width: "100%",
+                    alignItems: "center",
+                  }}
                 >
-                  <MenuIcon />
-                </IconButton>
-              </Box>
-            </Toolbar>
+                  <Link href="/" underline="none" color="inherit">
+                    <Typography
+                      variant="h6"
+                      color="primary"
+                      sx={{ fontWeight: "bold" }}
+                    >
+                      Trust
+                    </Typography>
+                  </Link>
+                  {account && showNetworkWarning && (
+                    <IconButton
+                      color="warning"
+                      size="small"
+                      onClick={handleSwitchNetwork}
+                    >
+                      <ErrorOutlineIcon />
+                    </IconButton>
+                  )}
+                  {isAuth && !account && (
+                    <IconButton
+                      color="warning"
+                      size="small"
+                      onClick={handleRedirectToSettings}
+                    >
+                      <AccountBalanceWalletIcon />
+                    </IconButton>
+                  )}
+                  <IconButton
+                    edge="start"
+                    color="inherit"
+                    onClick={() => setMobileMenuOpen(true)}
+                    sx={{ mr: 1 }}
+                  >
+                    <MenuIcon />
+                  </IconButton>
+                </Box>
+              </Toolbar>
+            </>
           ) : (
             renderDesktopNavbar()
           )}

@@ -1,4 +1,4 @@
-export const formatDate = (dateString) => {
+export const formatDate = (dateString: string) => {
   if (!dateString || dateString === "0001-01-01T00:00:00Z") return "—";
   return new Date(dateString).toLocaleDateString("en-US", {
     year: "numeric",
@@ -9,7 +9,7 @@ export const formatDate = (dateString) => {
   });
 };
 
-export const formatPrice = (price) => {
+export const formatPrice = (price: number) => {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "DZD",

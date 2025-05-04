@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  // Updated imports for MUI 7
   Dialog,
   DialogTitle,
   DialogContent,
@@ -11,7 +10,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Divider,
   Autocomplete,
   TextField,
   Alert,
@@ -30,6 +28,8 @@ import {
 import { Role, UserProps } from "../../../types";
 import { useFeedback } from "../../../FeedbackAlertContext";
 import { getCurrentUserId } from "../../../util/user";
+import { useOfferFactory } from "../../../hooks/useOfferFactory";
+import { useEthers } from "@usedapp/core";
 
 interface UserRolesDialogProps {
   open: boolean;
@@ -59,6 +59,10 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
   const currentUserID = getCurrentUserId();
   const { showFeedback } = useFeedback();
 
+  const { account } = useEthers();
+  const { factoryContract, error, grantRole, hasRole, revokeRole } =
+    useOfferFactory();
+
   const fetchAllRoles = useCallback(async () => {
     setIsLoadingRoles(true);
     try {
@@ -76,40 +80,57 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
   }, [apiUrl, token, showFeedback]);
 
   useEffect(() => {
+    if (error) {
+      showFeedback(error.msg, false);
+    }
+  }, [error, showFeedback]);
+
+  useEffect(() => {
     if (open) {
       fetchAllRoles();
     }
   }, [open, fetchAllRoles]);
 
   const handleAddRole = async () => {
-    if (!selectedRole || !user) return;
+    if (!user || !factoryContract || !selectedRole) return;
+
+    if (!account) {
+      showFeedback(
+        "No wallet detected, please link your wallet to your account first.",
+        false
+      );
+      return;
+    }
+
+    const isAdmin = await hasRole("ADMIN", account);
+
+    if (!isAdmin) {
+      showFeedback("Only admin users can manage roles", false);
+      return;
+    }
+
+    if (!user.publicWalletAddress) {
+      showFeedback(
+        "User does not have a wallet associated with this account.",
+        false
+      );
+      return;
+    }
 
     setIsProcessing(true);
+
     try {
-      const res = await fetch(`${apiUrl}/user/${user.ID}/roles`, {
-        method: "POST",
-        body: JSON.stringify({ roleID: selectedRole.ID }),
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const resData = await res.json();
-      if (resData.error) throw resData.error;
+      await grantRole(selectedRole.name, user.publicWalletAddress);
 
-      if (user && user.Roles) {
-        user.Roles.push(selectedRole);
-      }
-
-      setSelectedRole(null);
-      showFeedback(`Added role: ${selectedRole.name}`, true);
-      onRoleChange();
+      showFeedback("Updated user role on chain successfully...", true);
     } catch (err: any) {
-      showFeedback(err.msg || "Failed to add role to user", false);
+      showFeedback(
+        err.msg ||
+          "something went wrong with adding the user role, please try again later",
+        false
+      );
     } finally {
       setIsProcessing(false);
-      setActionPending(null);
-      setConfirmMessage(null);
     }
   };
 
@@ -180,13 +201,6 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
       }}
       maxWidth="sm"
       fullWidth
-      PaperProps={{
-        elevation: 3,
-        sx: {
-          borderRadius: 2,
-          overflow: "hidden",
-        },
-      }}
     >
       <DialogTitle
         sx={{
@@ -210,13 +224,6 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
           aria-label="close"
           size="small"
           disabled={isProcessing}
-          sx={{
-            color: "primary.contrastText",
-            backgroundColor: "primary.dark",
-            "&:hover": {
-              backgroundColor: "primary.main",
-            },
-          }}
         >
           <CloseIcon fontSize="small" />
         </IconButton>

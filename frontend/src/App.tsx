@@ -14,7 +14,7 @@ import LoadingPage from "./pages/LoadingPage";
 import UserSpace from "./pages/user/UserSpace";
 import { lightTheme, darkTheme } from "./theme";
 import Navbar from "./components/navbar/Navbar";
-import { UserProps } from "./types";
+import { Role, UserProps } from "./types";
 import ProfilePage from "./pages/user/ProfilePage";
 import AdminSpace from "./pages/admin/AdminSpace";
 import AccountActivationPage from "./pages/AccountActivationPage";
@@ -22,10 +22,12 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import PasswordResetPage from "./pages/PasswordResetPage";
 import TransactionTestPage from "./pages/TransactionsTestPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import { useEthers } from "@usedapp/core";
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isAuth, setIsAuth] = useState<boolean>(false);
+  const { deactivate } = useEthers();
   const [user, setUser] = useState<UserProps>({
     ID: 0,
     CreatedAt: "",
@@ -57,6 +59,7 @@ const App: React.FC = () => {
     localStorage.removeItem("userID");
     localStorage.removeItem("publicWalletAddress");
     localStorage.removeItem("expiryDate");
+    deactivate();
     navigate("/");
   };
 
@@ -163,15 +166,13 @@ const App: React.FC = () => {
               <Route path="/" element={<HomePage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<PasswordResetPage />} />
+              <Route path="/activation" element={<AccountActivationPage />} />
+
               {!isAuth ? (
                 <>
                   <Route
                     path="/login"
                     element={<LoginPage handleLogin={handleLogin} />}
-                  />
-                  <Route
-                    path="/activation"
-                    element={<AccountActivationPage />}
                   />
                 </>
               ) : (
@@ -196,12 +197,14 @@ const App: React.FC = () => {
                       />
                     }
                   />
-                  <Route
-                    path="/admin/*"
-                    element={
-                      <AdminSpace user={user} handleLogout={handleLogout} />
-                    }
-                  />
+                  {user.Roles.some((role: Role) => role.name === "admin") && (
+                    <Route
+                      path="/admin/*"
+                      element={
+                        <AdminSpace user={user} handleLogout={handleLogout} />
+                      }
+                    />
+                  )}
                 </>
               )}
               <Route path="*" element={<NotFoundPage />} />

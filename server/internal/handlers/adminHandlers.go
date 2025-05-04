@@ -44,7 +44,7 @@ func (h *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	offset := (page - 1) * limit
 
 	baseQuery := db.DB.DB.Model(&models.User{}).Preload("Roles").Select(
-		"id", "email", "first_name", "last_name", "created_at", "phone_number",
+		"id", "email", "first_name", "last_name", "created_at", "phone_number", "public_wallet_address",
 	)
 
 	if search != "" {
@@ -137,13 +137,11 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) PutUser(w http.ResponseWriter, r *http.Request) {
-	// Parse the incoming JSON payload
 	var payload struct {
-		FirstName   string   `json:"firstName"`
-		LastName    string   `json:"lastName"`
-		Email       string   `json:"email"`
-		PhoneNumber string   `json:"phoneNumber"`
-		RolesIDs    []string `json:"rolesIDs"`
+		FirstName   string `json:"firstName"`
+		LastName    string `json:"lastName"`
+		Email       string `json:"email"`
+		PhoneNumber string `json:"phoneNumber"`
 	}
 	err := utils.ParseJson(r, &payload)
 	if err != nil {
@@ -214,31 +212,6 @@ func (h *AdminHandler) PutUser(w http.ResponseWriter, r *http.Request) {
 	existingUser.Email = payload.Email
 	existingUser.PhoneNumber = payload.PhoneNumber
 
-	// Handle roles update
-	if len(payload.RolesIDs) > 0 {
-		// Clear existing roles
-		if err := tx.Model(&existingUser).Association("Roles").Clear(); err != nil {
-			tx.Rollback()
-			utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to clear existing roles"))
-			return
-		}
-
-		// Assign new roles
-		for _, roleIDStr := range payload.RolesIDs {
-			var dbRole models.Role
-			if err := tx.Where("id = ?", roleIDStr).First(&dbRole).Error; err != nil {
-				tx.Rollback()
-				utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("role with ID %s not found", roleIDStr))
-				return
-			}
-			if err := tx.Model(&existingUser).Association("Roles").Append(&dbRole); err != nil {
-				tx.Rollback()
-				utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to assign roles"))
-				return
-			}
-		}
-	}
-
 	// Save the updated user
 	if err := tx.Save(&existingUser).Error; err != nil {
 		tx.Rollback()
@@ -270,11 +243,10 @@ func (h *AdminHandler) PutUser(w http.ResponseWriter, r *http.Request) {
 func (h *AdminHandler) PostUser(w http.ResponseWriter, r *http.Request) {
 	// Parse the json body
 	var payload struct {
-		FirstName   string   `json:"firstName"`
-		LastName    string   `json:"lastName"`
-		Email       string   `json:"email"`
-		PhoneNumber string   `json:"phoneNumber"`
-		RolesIDs    []string `json:"rolesIDs"`
+		FirstName   string `json:"firstName"`
+		LastName    string `json:"lastName"`
+		Email       string `json:"email"`
+		PhoneNumber string `json:"phoneNumber"`
 	}
 
 	if err := utils.ParseJson(r, &payload); err != nil {
@@ -339,25 +311,6 @@ func (h *AdminHandler) PostUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle roles assignment
-	if len(payload.RolesIDs) > 0 {
-		// Verify roles exist and assign them
-		for _, roleIDStr := range payload.RolesIDs {
-			var dbRole models.Role
-			if err := tx.Where("id = ?", roleIDStr).First(&dbRole).Error; err != nil {
-				tx.Rollback()
-				utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("role with ID %s not found", roleIDStr))
-				return
-			}
-			if err := tx.Model(&user).Association("Roles").Append(&dbRole); err != nil {
-				tx.Rollback()
-				utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to assign roles"))
-				return
-			}
-		}
-	}
-
-	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
@@ -549,6 +502,8 @@ func (h *AdminHandler) PostUserRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: add server side validatoin of transaction happening before commiting role change on the server
+
 	// Load role
 	var role models.Role
 	if err := db.DB.DB.First(&role, payload.RoleID).Error; err != nil {
@@ -623,6 +578,8 @@ func (h *AdminHandler) DeleteUserRole(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	// TODO: add server side validatoin of transaction happening before commiting role change on the server
 
 	// Check the user actually has this role
 	hasRole := false

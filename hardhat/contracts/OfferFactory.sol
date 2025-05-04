@@ -17,42 +17,6 @@ contract OfferFactory is AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    function grantTender(
-        address account
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        grantRole(TENDER_ROLE, account);
-    }
-
-    function revokeTender(
-        address account
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        revokeRole(TENDER_ROLE, account);
-    }
-
-    function grantEntrepreneur(
-        address account
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        grantRole(ENTREPRENEUR_ROLE, account);
-    }
-
-    function revokeEntrepreneur(
-        address account
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        revokeRole(ENTREPRENEUR_ROLE, account);
-    }
-
-    function grantExpert(
-        address account
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        grantRole(EXPERT_ROLE, account);
-    }
-
-    function revokeExpert(
-        address account
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        revokeRole(EXPERT_ROLE, account);
-    }
-
     function hasRole(
         bytes32 role,
         address account
