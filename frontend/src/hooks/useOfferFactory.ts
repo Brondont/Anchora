@@ -1,5 +1,11 @@
 import { Contract } from "ethers";
-import { useContractFunction, useEthers, useSigner } from "@usedapp/core";
+import {
+  TransactionState,
+  TransactionStatus,
+  useContractFunction,
+  useEthers,
+  useSigner,
+} from "@usedapp/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Interface, keccak256, toUtf8Bytes } from "ethers/lib/utils";
 
@@ -329,6 +335,8 @@ export interface UseOfferFactory {
   hasRole: (role: string, address: string) => Promise<boolean>;
   createOffer: () => Promise<void>;
   error?: UseOfferError;
+  grantState: TransactionStatus;
+  revokeState: TransactionStatus;
 }
 
 interface UseOfferError {
@@ -374,7 +382,7 @@ export function useOfferFactory(): UseOfferFactory {
       case "EXPERT":
         return keccak256(toUtf8Bytes("EXPERT_ROLE"));
       case "ADMIN":
-        return "0x0000000000000000000000000000000000000000000000000000000000000000"; // DEFAULT_ADMIN_ROLE
+        return "0x0000000000000000000000000000000000000000000000000000000000000000";
       default:
         throw new Error("Invalid role name");
     }
@@ -382,32 +390,28 @@ export function useOfferFactory(): UseOfferFactory {
 
   const handleRoleAction = useCallback(
     async (action: "grant" | "revoke", roleName: string, address: string) => {
-      if (!factoryContract || !account) {
-        throw new Error("Contract not initialized");
-      }
-
-      const role = getRoleBytes32(roleName);
-      const currentStatus = await factoryContract.hasRole(role, address);
+      if (!factoryContract) throw new Error("Contract not initialized");
+      if (!account) throw new Error("No connected account");
 
       try {
+        const role = getRoleBytes32(roleName);
+
         if (action === "grant") {
-          if (currentStatus) {
-            throw new Error(`user already has ${roleName} role`);
-          }
-          await grant(role, address);
-        } else {
-          if (!currentStatus) {
-            throw new Error(`user doesn't have ${roleName} role`);
-          }
-          await revoke(role, address);
+          const tx = await grant(role, address);
+          return tx;
+        } else if (action === "revoke") {
+          const tx = await revoke(role, address);
+          return tx;
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        setError({ msg: message });
-        throw new Error(`Role management failed: ${message}`);
+        console.error(`Failed to ${action} role:`, err);
+        setError({
+          msg: `Failed to ${action} role: ${(err as Error).message}`,
+        });
+        throw err;
       }
     },
-    [factoryContract, account, grant, revoke, getRoleBytes32]
+    [factoryContract, account, getRoleBytes32, grant, revoke]
   );
 
   const grantRole = useCallback(
@@ -444,5 +448,7 @@ export function useOfferFactory(): UseOfferFactory {
       await createOffer();
     },
     error,
+    grantState,
+    revokeState,
   };
 }

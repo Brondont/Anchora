@@ -51,7 +51,7 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<{
     type: "add" | "remove";
-    role: Role | null;
+    role: Role;
   } | null>(null);
 
   const apiUrl = import.meta.env.VITE_API_URL;
@@ -60,8 +60,15 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
   const { showFeedback } = useFeedback();
 
   const { account } = useEthers();
-  const { factoryContract, error, grantRole, hasRole, revokeRole } =
-    useOfferFactory();
+  const {
+    factoryContract,
+    error,
+    grantRole,
+    grantState,
+    hasRole,
+    revokeRole,
+    revokeState,
+  } = useOfferFactory();
 
   const fetchAllRoles = useCallback(async () => {
     setIsLoadingRoles(true);
@@ -91,8 +98,119 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
     }
   }, [open, fetchAllRoles]);
 
-  const handleAddRole = async () => {
-    if (!user || !factoryContract || !selectedRole) return;
+  useEffect(() => {
+    if (!user || !actionPending || actionPending.type !== "add") return;
+
+    if (grantState.status === "Success") {
+      const txHash = grantState.transaction?.hash;
+
+      if (!txHash) {
+        showFeedback("failed to update user role off chain", false);
+        setIsProcessing(false);
+        return;
+      }
+
+      const headers = new Headers();
+
+      headers.append("Authorization", `Bearer ${token}`);
+      headers.append("Content-Type", "application/json");
+      headers.append("X-Tx-Hash", txHash);
+
+      fetch(`${apiUrl}/user/${user.ID}/roles`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          roleID: actionPending.role.ID,
+        }),
+      })
+        .then((res) => res.json())
+        .then((resData) => {
+          if (resData.error) throw resData.error;
+
+          if (user && user.Roles) {
+            user.Roles.push(actionPending.role);
+          }
+
+          onRoleChange();
+          showFeedback("Role granted off‑chain!", true);
+        })
+        .catch((err) => {
+          showFeedback(err.msg || "Off‑chain sync failed", false);
+        })
+        .finally(() => {
+          setIsProcessing(false);
+          setActionPending(null);
+          setConfirmMessage(null);
+        });
+    }
+
+    if (grantState.status === "Fail" || grantState.status === "Exception") {
+      // handle revert or user rejection
+      showFeedback(grantState.errorMessage || "Transaction failed", false);
+      setIsProcessing(false);
+    }
+  }, [grantState, user, actionPending, onRoleChange]);
+
+  // Modify the useEffect for revokeState
+  useEffect(() => {
+    if (!user || !actionPending || actionPending.type !== "remove") return;
+
+    if (revokeState.status === "Success") {
+      const txHash = revokeState.transaction?.hash;
+
+      if (!txHash) {
+        showFeedback("failed to update user role off chain", false);
+        setIsProcessing(false);
+        return;
+      }
+
+      const headers = new Headers();
+
+      headers.append("Authorization", `Bearer ${token}`);
+      headers.append("X-Tx-Hash", txHash);
+
+      fetch(`${apiUrl}/user/${user.ID}/roles/${actionPending.role.ID}`, {
+        method: "DELETE",
+        headers,
+      })
+        .then((res) => {
+          return res.json();
+        })
+        .then((resData) => {
+          if (resData.error) throw resData.error;
+
+          if (user && user.Roles) {
+            user.Roles = user.Roles.filter(
+              (r) => r.ID !== actionPending.role.ID
+            );
+          }
+
+          showFeedback(`Removed role: ${actionPending.role.name}`, true);
+          onRoleChange();
+        })
+        .catch((err) => {
+          showFeedback(
+            err.msg || "something went wrong with revoking the role try again",
+            false
+          );
+        })
+        .finally(() => {
+          setIsProcessing(false);
+          setActionPending(null);
+          setConfirmMessage(null);
+        });
+    }
+
+    if (revokeState.status === "Fail" || revokeState.status === "Exception") {
+      // handle revert or user rejection
+      showFeedback(revokeState.errorMessage || "Transaction failed", false);
+      setIsProcessing(false);
+    }
+  }, [revokeState, user, actionPending, onRoleChange]);
+
+  // Update the handleRole function
+  const handleRole = async () => {
+    if (!user || !factoryContract || !actionPending) return;
 
     if (!account) {
       showFeedback(
@@ -120,67 +238,27 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
     setIsProcessing(true);
 
     try {
-      await grantRole(selectedRole.name, user.publicWalletAddress);
+      if (actionPending.type === "add") {
+        await grantRole(actionPending.role.name, user.publicWalletAddress);
+      } else {
+        await revokeRole(actionPending.role.name, user.publicWalletAddress);
+      }
 
       showFeedback("Updated user role on chain successfully...", true);
     } catch (err: any) {
       showFeedback(
         err.msg ||
-          "something went wrong with adding the user role, please try again later",
+          "something went wrong with updating the user role, please try again later",
         false
       );
-    } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleRemoveRole = async (role: Role) => {
-    if (!user) return;
-
-    // Check if this would remove all roles
-    if (user.Roles.length === 1) {
-      showFeedback("Cannot remove all roles from a user", false);
-      return;
-    }
-
-    // Check if user is trying to remove their own admin role
-    if (user.ID == currentUserID && role.name.toLowerCase() === "admin") {
-      showFeedback("Cannot remove your own admin role", false);
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const res = await fetch(`${apiUrl}/user/${user.ID}/roles/${role.ID}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const resData = await res.json();
-      if (resData.error) throw resData.error;
-
-      if (user && user.Roles) {
-        user.Roles = user.Roles.filter((r) => r.ID !== role.ID);
-      }
-
-      showFeedback(`Removed role: ${role.name}`, true);
-      onRoleChange();
-    } catch (err: any) {
-      showFeedback(err.msg || "Failed to remove role from user", false);
-    } finally {
-      setIsProcessing(false);
-      setActionPending(null);
-      setConfirmMessage(null);
-    }
-  };
-
+  // Update the confirmAction function
   const confirmAction = () => {
     if (!actionPending) return;
-
-    if (actionPending.type === "add" && actionPending.role) {
-      handleAddRole();
-    } else if (actionPending.type === "remove" && actionPending.role) {
-      handleRemoveRole(actionPending.role);
-    }
+    handleRole();
   };
 
   const cancelAction = () => {
@@ -334,9 +412,10 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
                   startIcon={<AddIcon />}
                   disabled={!selectedRole || isProcessing}
                   onClick={() => {
+                    if (!selectedRole) return;
                     setActionPending({ type: "add", role: selectedRole });
                     setConfirmMessage(
-                      `Are you sure you want to add the "${selectedRole?.name}" role to this user?`
+                      `Are you sure you want to add the "${selectedRole.name}" role to this user?`
                     );
                   }}
                   sx={{
