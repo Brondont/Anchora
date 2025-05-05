@@ -1,6 +1,5 @@
 import { Contract } from "ethers";
 import {
-  TransactionState,
   TransactionStatus,
   useContractFunction,
   useEthers,
@@ -337,6 +336,7 @@ export interface UseOfferFactory {
   error?: UseOfferError;
   grantState: TransactionStatus;
   revokeState: TransactionStatus;
+  resetStates: () => void;
 }
 
 interface UseOfferError {
@@ -353,18 +353,28 @@ export function useOfferFactory(): UseOfferFactory {
     return new Contract(factoryAddress, ABI, signer);
   }, [signer, factoryAddress]);
 
-  const { send: grant, state: grantState } = useContractFunction(
-    factoryContract,
-    "grantRole"
-  );
-  const { send: revoke, state: revokeState } = useContractFunction(
-    factoryContract,
-    "revokeRole"
-  );
-  const { send: createOffer, state: createOfferState } = useContractFunction(
-    factoryContract,
-    "createOffer"
-  );
+  const {
+    send: grant,
+    state: grantState,
+    resetState: resetGrantState,
+  } = useContractFunction(factoryContract, "grantRole");
+  const {
+    send: revoke,
+    state: revokeState,
+    resetState: resetRevokeState,
+  } = useContractFunction(factoryContract, "revokeRole");
+  const {
+    send: createOffer,
+    state: createOfferState,
+    resetState: resetOfferState,
+  } = useContractFunction(factoryContract, "createOffer");
+
+  // Add a function to reset states
+  const resetStates = useCallback(() => {
+    resetGrantState();
+    resetRevokeState();
+    resetOfferState();
+  }, [resetGrantState, resetRevokeState]);
 
   useEffect(() => {
     const errorState = [grantState, revokeState, createOfferState].find(
@@ -450,5 +460,6 @@ export function useOfferFactory(): UseOfferFactory {
     error,
     grantState,
     revokeState,
+    resetStates,
   };
 }

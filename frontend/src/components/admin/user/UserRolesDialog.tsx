@@ -68,10 +68,13 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
     hasRole,
     revokeRole,
     revokeState,
+    resetStates,
   } = useOfferFactory();
 
   const fetchAllRoles = useCallback(async () => {
     setIsLoadingRoles(true);
+
+    console.log("this ran");
     try {
       const res = await fetch(`${apiUrl}/roles`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -80,7 +83,10 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
       if (resData.error) throw resData.error;
       setAvailableRoles(resData.roles);
     } catch (err: any) {
-      showFeedback(err.msg || "Failed to load roles", false);
+      showFeedback(
+        "Unable to retrieve roles. Please try again later.",
+        "error"
+      );
     } finally {
       setIsLoadingRoles(false);
     }
@@ -88,7 +94,7 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
 
   useEffect(() => {
     if (error) {
-      showFeedback(error.msg, false);
+      showFeedback("Contract interaction failed. Please try again.", "error");
     }
   }, [error, showFeedback]);
 
@@ -99,19 +105,31 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
   }, [open, fetchAllRoles]);
 
   useEffect(() => {
-    if (!user || !actionPending || actionPending.type !== "add") return;
+    if (!user || !actionPending) return;
 
-    if (grantState.status === "Success") {
+    if (grantState.status === "Mining") {
+      showFeedback(
+        `Granting ${actionPending.role.name} role on blockchain...`,
+        "pending"
+      );
+    } else if (grantState.status === "Success") {
       const txHash = grantState.transaction?.hash;
 
       if (!txHash) {
-        showFeedback("failed to update user role off chain", false);
+        showFeedback(
+          "Permission update failed during off-chain synchronization",
+          "error"
+        );
         setIsProcessing(false);
         return;
       }
 
-      const headers = new Headers();
+      showFeedback(
+        "Role granted on blockchain. Synchronizing with database...",
+        "pending"
+      );
 
+      const headers = new Headers();
       headers.append("Authorization", `Bearer ${token}`);
       headers.append("Content-Type", "application/json");
       headers.append("X-Tx-Hash", txHash);
@@ -132,40 +150,71 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
           }
 
           onRoleChange();
-          showFeedback("Role granted off‑chain!", true);
+          showFeedback(
+            `Role '${actionPending.role.name}' successfully granted`,
+            "success"
+          );
         })
-        .catch((err) => {
-          showFeedback(err.msg || "Off‑chain sync failed", false);
+        .catch((err: any) => {
+          showFeedback(
+            err.msg ||
+              "Database synchronization failed. The role may need to be granted again.",
+            "error"
+          );
         })
         .finally(() => {
-          setIsProcessing(false);
           setActionPending(null);
+          setIsProcessing(false);
           setConfirmMessage(null);
+          resetStates();
         });
     }
 
     if (grantState.status === "Fail" || grantState.status === "Exception") {
-      // handle revert or user rejection
-      showFeedback(grantState.errorMessage || "Transaction failed", false);
+      showFeedback(
+        grantState.errorMessage ||
+          "Permission update failed. Transaction was not completed.",
+        "error"
+      );
       setIsProcessing(false);
+      resetStates();
     }
-  }, [grantState, user, actionPending, onRoleChange]);
+  }, [
+    grantState,
+    user,
+    actionPending,
+    onRoleChange,
+    token,
+    apiUrl,
+    showFeedback,
+  ]);
 
-  // Modify the useEffect for revokeState
   useEffect(() => {
-    if (!user || !actionPending || actionPending.type !== "remove") return;
+    if (!user || !actionPending) return;
 
-    if (revokeState.status === "Success") {
+    if (revokeState.status === "Mining") {
+      showFeedback(
+        `Revoking ${actionPending.role.name} role on blockchain...`,
+        "pending"
+      );
+    } else if (revokeState.status === "Success") {
       const txHash = revokeState.transaction?.hash;
 
       if (!txHash) {
-        showFeedback("failed to update user role off chain", false);
+        showFeedback(
+          "Permission update failed during off-chain synchronization",
+          "error"
+        );
         setIsProcessing(false);
         return;
       }
 
-      const headers = new Headers();
+      showFeedback(
+        "Role revoked on blockchain. Synchronizing with database...",
+        "pending"
+      );
 
+      const headers = new Headers();
       headers.append("Authorization", `Bearer ${token}`);
       headers.append("X-Tx-Hash", txHash);
 
@@ -185,37 +234,52 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
             );
           }
 
-          showFeedback(`Removed role: ${actionPending.role.name}`, true);
+          showFeedback(
+            `Role '${actionPending.role.name}' successfully revoked`,
+            "success"
+          );
           onRoleChange();
         })
-        .catch((err) => {
+        .catch(() => {
           showFeedback(
-            err.msg || "something went wrong with revoking the role try again",
-            false
+            "Database synchronization failed. Please verify the role status.",
+            "error"
           );
         })
         .finally(() => {
-          setIsProcessing(false);
           setActionPending(null);
+          setIsProcessing(false);
           setConfirmMessage(null);
+          resetStates();
         });
     }
 
     if (revokeState.status === "Fail" || revokeState.status === "Exception") {
-      // handle revert or user rejection
-      showFeedback(revokeState.errorMessage || "Transaction failed", false);
+      showFeedback(
+        revokeState.errorMessage ||
+          "Permission revocation failed. Transaction was not completed.",
+        "error"
+      );
+      resetStates();
       setIsProcessing(false);
     }
-  }, [revokeState, user, actionPending, onRoleChange]);
+  }, [
+    revokeState,
+    user,
+    onRoleChange,
+    token,
+    apiUrl,
+    showFeedback,
+    actionPending,
+  ]);
 
-  // Update the handleRole function
   const handleRole = async () => {
     if (!user || !factoryContract || !actionPending) return;
 
     if (!account) {
       showFeedback(
-        "No wallet detected, please link your wallet to your account first.",
-        false
+        "No connected wallet detected. Please connect your wallet to proceed.",
+        "error"
       );
       return;
     }
@@ -223,14 +287,17 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
     const isAdmin = await hasRole("ADMIN", account);
 
     if (!isAdmin) {
-      showFeedback("Only admin users can manage roles", false);
+      showFeedback(
+        "Administrative permissions required for role management",
+        "error"
+      );
       return;
     }
 
     if (!user.publicWalletAddress) {
       showFeedback(
-        "User does not have a wallet associated with this account.",
-        false
+        "This user account is not associated with a blockchain wallet",
+        "error"
       );
       return;
     }
@@ -238,25 +305,44 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
     setIsProcessing(true);
 
     try {
+      const hasRoleStatus = await hasRole(
+        actionPending.role.name,
+        user.publicWalletAddress
+      );
       if (actionPending.type === "add") {
+        if (hasRoleStatus) {
+          throw { msg: "User already has this role on the blockchain" };
+        }
+
+        showFeedback(
+          `Initiating blockchain transaction to grant ${actionPending.role.name} role...`,
+          "info"
+        );
         await grantRole(actionPending.role.name, user.publicWalletAddress);
       } else {
+        if (!hasRoleStatus) {
+          throw { msg: "User does not have this role on the blockchain" };
+        }
+
+        showFeedback(
+          `Initiating blockchain transaction to revoke ${actionPending.role.name} role...`,
+          "info"
+        );
         await revokeRole(actionPending.role.name, user.publicWalletAddress);
       }
-
-      showFeedback("Updated user role on chain successfully...", true);
     } catch (err: any) {
       showFeedback(
         err.msg ||
-          "something went wrong with updating the user role, please try again later",
-        false
+          "Transaction could not be initiated. Please try again later.",
+        "error"
       );
       setIsProcessing(false);
+      resetStates();
     }
   };
 
-  // Update the confirmAction function
   const confirmAction = () => {
+    console.log("this ran", actionPending);
     if (!actionPending) return;
     handleRole();
   };
@@ -415,13 +501,8 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
                     if (!selectedRole) return;
                     setActionPending({ type: "add", role: selectedRole });
                     setConfirmMessage(
-                      `Are you sure you want to add the "${selectedRole.name}" role to this user?`
+                      `Grant "${selectedRole.name}" permission to this user? This will require a blockchain transaction.`
                     );
-                  }}
-                  sx={{
-                    borderRadius: 1.5,
-                    textTransform: "none",
-                    px: 2,
                   }}
                 >
                   Add
@@ -493,7 +574,7 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
                         onClick={() => {
                           setActionPending({ type: "remove", role });
                           setConfirmMessage(
-                            `Are you sure you want to remove the "${role.name}" role from this user?`
+                            `Revoke "${role.name}" permission from this user? This will require a blockchain transaction.`
                           );
                         }}
                         disabled={
