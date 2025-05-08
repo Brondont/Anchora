@@ -47,6 +47,7 @@ func ConnectDB() {
 	); err != nil {
 		log.Printf("Migration failed %v", err)
 	}
+
 	DB = DBInstance{
 		DB: db,
 	}

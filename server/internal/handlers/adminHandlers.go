@@ -562,12 +562,6 @@ func (h *AdminHandler) DeleteUserRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Ensure user won't be left with zero roles
-	if len(user.Roles) <= 1 {
-		utils.WriteError(w, http.StatusBadRequest, errors.New("cannot remove role; user must have at least one role"))
-		return
-	}
-
 	// Load the specific role
 	var role models.Role
 	if err := db.DB.DB.First(&role, roleID).Error; err != nil {
