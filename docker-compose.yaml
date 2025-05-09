@@ -7,38 +7,14 @@ networks:
     driver: bridge
 
 services:
-  frontend:
-    build:
-      context: ./frontend
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/usr/src/app
-      - /usr/src/app/node_modules
-    networks:
-      - trust
-    env_file:
-      - ./frontend/.env
-  trust-api:
-    build:
-      context: ./server
-    ports:
-      - "3080:3080"
-    volumes:
-      - ./server:/usr/src/app
-      - ./server/public:/usr/src/app/public
-    networks:
-      - trust
-    depends_on:
-      - db
-    env_file:
-      - ./server/.env
   db:
     image: postgres:15-alpine
     ports:
       - "5432:5432"
     networks:
       - trust
+    depends_on:
+      - hardhat
     volumes:
       - postgres_data:/var/lib/postgresql/data
     env_file:
@@ -66,3 +42,30 @@ services:
       - trust
     env_file:
       - ./hardhat/.env
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/usr/src/app
+      - /usr/src/app/node_modules
+    networks:
+      - trust
+    env_file:
+      - ./frontend/.env
+  trust-api:
+    build:
+      context: ./server
+    ports:
+      - "3080:3080"
+    volumes:
+      - ./server:/usr/src/app
+      - ./server/public:/usr/src/app/public
+    networks:
+      - trust
+    depends_on:
+      - hardhat
+      - db
+    env_file:
+      - ./server/.env

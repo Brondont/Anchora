@@ -13,8 +13,8 @@ contract OfferFactory is AccessControl {
 
     event OfferCreated(address indexed offerAddress, address indexed tender);
 
-    constructor() {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    constructor(address initialAdmin) {
+        _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin);
     }
 
     function hasRole(
@@ -24,8 +24,25 @@ contract OfferFactory is AccessControl {
         return super.hasRole(role, account);
     }
 
-    function createOffer() external onlyRole(TENDER_ROLE) {
-        Offer newOffer = new Offer(msg.sender, address(this));
+    function createOffer(
+        uint256 submissionStart,
+        uint256 submissionEnd,
+        uint256 reviewStart,
+        uint256 reviewEnd
+    ) external onlyRole(TENDER_ROLE) {
+        // validatoin for proper time periods
+        require(submissionStart < submissionEnd, "Bad submission window");
+        require(submissionEnd < reviewStart, "Review must follow submission");
+        require(reviewStart < reviewEnd, "Bad review window");
+
+        Offer newOffer = new Offer(
+            msg.sender,
+            address(this),
+            submissionStart,
+            submissionEnd,
+            reviewStart,
+            reviewEnd
+        );
         allOffers.push(address(newOffer));
         emit OfferCreated(address(newOffer), msg.sender);
     }

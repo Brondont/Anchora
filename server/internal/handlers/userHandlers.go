@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/Brondont/trust-api/db"
@@ -47,10 +49,16 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusBadRequest, errors.New("no user id provided"))
 		return
 	}
+	userIDInt, err := strconv.ParseUint(userID, 10, 64)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid user ID: %w", err))
+		return
+	}
+	userIDuint := uint(userIDInt)
 
 	// Check if the caller is an admin or is the same user.
 	// Note: We allow access if the user is an admin OR the token's userID equals the requested userID.
-	if !auth.HasRole(claims, []string{"admin"}) && claims.UserID != userID {
+	if !auth.HasRole(claims, []string{"admin"}) && claims.UserID != userIDuint {
 		utils.WriteError(w, http.StatusForbidden, errors.New("insufficient permissions"))
 		return
 	}

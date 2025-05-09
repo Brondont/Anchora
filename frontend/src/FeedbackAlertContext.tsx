@@ -1,9 +1,11 @@
 import React, {
   createContext,
-  useContext,
   useState,
   useCallback,
   ReactNode,
+  useMemo,
+  useRef,
+  useContext,
 } from "react";
 import { FeedbackStatus } from "./components/feedbackAlert/FeedbackAlert";
 
@@ -26,45 +28,50 @@ interface FeedbackProviderProps {
 export const FeedbackProvider: React.FC<FeedbackProviderProps> = ({
   children,
 }) => {
-  const [feedback, setFeedback] = useState<string>("");
+  const [feedback, setFeedback] = useState("");
   const [status, setStatus] = useState<FeedbackStatus>(true);
-  const [alertIsOn, setAlertIsOn] = useState<boolean>(false);
-  const [timer, setTimer] = useState<NodeJS.Timeout | null>(null);
+  const [alertIsOn, setAlertIsOn] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const hideFeedback = useCallback(() => {
     setAlertIsOn(false);
-    if (timer) {
-      clearTimeout(timer);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
-  }, [timer]);
+  }, []);
 
   const showFeedback = useCallback(
     (message: string, newStatus: FeedbackStatus) => {
-      // Clear any existing timer
-      if (timer) {
-        clearTimeout(timer);
-      }
+      if (timerRef.current) clearTimeout(timerRef.current);
 
-      // Set feedback message and status
       setFeedback(message);
       setStatus(newStatus);
       setAlertIsOn(true);
 
-      // Auto-hide after a delay unless it's a pending status
       if (newStatus !== "pending") {
-        const newTimer = setTimeout(() => {
+        timerRef.current = setTimeout(() => {
           setAlertIsOn(false);
+          timerRef.current = null;
         }, 5000);
-        setTimer(newTimer);
       }
     },
-    [timer]
+    []
+  );
+
+  const contextValue = useMemo(
+    () => ({
+      feedback,
+      status,
+      alertIsOn,
+      showFeedback,
+      hideFeedback,
+    }),
+    [feedback, status, alertIsOn, showFeedback, hideFeedback]
   );
 
   return (
-    <FeedbackAlertContext.Provider
-      value={{ feedback, status, alertIsOn, showFeedback, hideFeedback }}
-    >
+    <FeedbackAlertContext.Provider value={contextValue}>
       {children}
     </FeedbackAlertContext.Provider>
   );

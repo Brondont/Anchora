@@ -74,7 +74,6 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
   const fetchAllRoles = useCallback(async () => {
     setIsLoadingRoles(true);
 
-    console.log("this ran");
     try {
       const res = await fetch(`${apiUrl}/roles`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -94,7 +93,10 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
 
   useEffect(() => {
     if (error) {
-      showFeedback("Contract interaction failed. Please try again.", "error");
+      showFeedback(
+        error.msg || "Contract interaction failed. Please try again.",
+        "error"
+      );
     }
   }, [error, showFeedback]);
 
@@ -274,7 +276,15 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
   ]);
 
   const handleRole = async () => {
-    if (!user || !factoryContract || !actionPending) return;
+    if (!user || !actionPending) return;
+
+    if (!user.publicWalletAddress) {
+      showFeedback(
+        "This user account is not associated with a blockchain wallet",
+        "error"
+      );
+      return;
+    }
 
     if (!account) {
       showFeedback(
@@ -289,14 +299,6 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
     if (!isAdmin) {
       showFeedback(
         "Administrative permissions required for role management",
-        "error"
-      );
-      return;
-    }
-
-    if (!user.publicWalletAddress) {
-      showFeedback(
-        "This user account is not associated with a blockchain wallet",
         "error"
       );
       return;
@@ -342,7 +344,6 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
   };
 
   const confirmAction = () => {
-    console.log("this ran", actionPending);
     if (!actionPending) return;
     handleRole();
   };
@@ -579,7 +580,6 @@ const UserRolesDialog: React.FC<UserRolesDialogProps> = ({
                         }}
                         disabled={
                           isProcessing ||
-                          user.Roles.length === 1 ||
                           (user.ID === currentUserID &&
                             role.name.toLowerCase() === "admin" &&
                             user.Roles.filter(

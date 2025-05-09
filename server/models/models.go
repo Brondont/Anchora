@@ -48,33 +48,24 @@ type ExpertEvaluation struct {
 
 type Offer struct {
 	gorm.Model
+	ContractAddress string `json:"ContractAddress" gorm:"type:varchar(200);not null;unique"`
 	// Basic offer details
-	TenderReference         string `json:"tenderReference" gorm:"type:varchar(100);unique;not null"`
-	Title                   string `json:"title" gorm:"type:varchar(200);not null"`
-	Summary                 string `json:"summary" gorm:"type:text;not null"`
-	TechnicalSpecifications string `json:"technicalSpecifications" gorm:"type:text;not null"`
-
-	// Categorization & classification
-	CPVCode  string `json:"cpvCode" gorm:"type:varchar(50)"`
-	Sector   Sector `json:"sector"`
-	SectorID uint   `json:"sectorID"`
+	Title   string `json:"title" gorm:"type:varchar(200);not null"`
+	Summary string `json:"summary" gorm:"type:text;not null"`
 
 	// Financial and contractual details
-	Budget                float64 `json:"budget" gorm:"not null"`
-	QualificationRequired string  `json:"qualificationRequired" gorm:"type:text"`
-	ContractDuration      string  `json:"contractDuration" gorm:"type:varchar(100)"`
+	Budget   float64 `json:"budget" gorm:"not null"`
+	Currency string  `json:"currency"`
 
 	// Timeline Fields
-	OfferActiveStart        time.Time `json:"offerActiveStart" gorm:"type:timestamp;not null"`
 	ProposalSubmissionStart time.Time `json:"proposalSubmissionStart" gorm:"type:timestamp;not null"`
 	ProposalSubmissionEnd   time.Time `json:"proposalSubmissionEnd" gorm:"type:timestamp;not null"`
+	ProposalReviewStart     time.Time `json:"proposalReviewStart" gorm:"type:timestamp;not null"`
 	ProposalReviewEnd       time.Time `json:"proposalReviewEnd" gorm:"type:timestamp;not null"`
-	OfferActiveEnd          time.Time `json:"offerActiveEnd" gorm:"type:timestamp;not null"`
 
 	// Management of offer state
-	Status       string `json:"status" gorm:"type:varchar(50);default:'open'"`
-	WinningBidID uint   `json:"winningBidID"`
-	CreatedBy    uint   `json:"createdBy" gorm:"not null"`
+	WinningProposalID uint `json:"WinningProposalID"`
+	CreatedBy         uint `json:"createdBy" gorm:"not null"`
 
 	// Documents automatically related to this offer
 	Documents []Document `json:"documents" gorm:"polymorphic:Documentable;"`

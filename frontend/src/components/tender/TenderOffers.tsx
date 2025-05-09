@@ -30,6 +30,8 @@ import EventNoteIcon from "@mui/icons-material/EventNote";
 import FileUpload from "../fileUpload/FileUpload";
 import { isRequired, ValidatorFunction } from "../../util/validators";
 import { useFeedback } from "../../FeedbackAlertContext";
+import { useOfferFactory } from "../../hooks/useOfferFactory";
+import { useEthers } from "@usedapp/core";
 
 type OfferFormProps = {
   [key: string]: {
@@ -83,15 +85,15 @@ const TenderOffers: React.FC = () => {
     budget: { value: 0, error: "", validators: [isRequired] },
     currency: { value: "", error: "", validators: [isRequired] },
     category: { value: "", error: "", validators: [isRequired] },
-    offerActiveStart: { value: "", error: "", validators: [isRequired] },
     proposalSubmissionStart: { value: "", error: "", validators: [isRequired] },
     proposalSubmissionEnd: { value: "", error: "", validators: [isRequired] },
+    proposalReviewStart: { value: "", error: "", validators: [isRequired] },
     proposalReviewEnd: { value: "", error: "", validators: [isRequired] },
-    offerActiveEnd: { value: "", error: "", validators: [isRequired] },
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sectorOptions, setSectorOptions] = useState<SectorOption[]>([]);
+  const [offerContractHash, setOfferContractHash] = useState<string>("");
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [calendarView, setCalendarView] = useState<"month" | "week" | "day">(
     "week"
@@ -99,6 +101,17 @@ const TenderOffers: React.FC = () => {
   const [files, setFiles] = useState<File[]>([]);
   const { showFeedback } = useFeedback();
 
+  const {
+    factoryContract,
+    createOffer,
+    createOfferState,
+    resetStates,
+    hasRole,
+    error,
+  } = useOfferFactory();
+  const { account } = useEthers();
+
+  const token = localStorage.getItem("token");
   const apiUrl = import.meta.env.VITE_API_URL;
 
   const fetchSectors = async () => {
@@ -118,10 +131,18 @@ const TenderOffers: React.FC = () => {
       showFeedback(
         err.msg || "something went wrong loading data, reload your page",
         false
-        // TOOD: work on refresh tokens or wahtever they're called
       );
     }
   };
+
+  useEffect(() => {
+    if (error) {
+      showFeedback(
+        error.msg || "Contract interaction failed. Please try again.",
+        "error"
+      );
+    }
+  }, [error, showFeedback]);
 
   useEffect(() => {
     fetchSectors();
@@ -130,18 +151,17 @@ const TenderOffers: React.FC = () => {
   useEffect(() => {
     const newEvents: CalendarEvent[] = [];
     const {
-      offerActiveStart,
       proposalSubmissionStart,
       proposalSubmissionEnd,
+      proposalReviewStart,
       proposalReviewEnd,
-      offerActiveEnd,
     } = offerForm;
 
-    if (offerActiveStart.value && proposalSubmissionStart.value) {
+    if (proposalSubmissionStart.value) {
       newEvents.push({
         id: 1,
         title: "Offer Publication Phase",
-        start: new Date(offerActiveStart.value as string),
+        start: new Date(),
         end: new Date(proposalSubmissionStart.value as string),
       });
     }
@@ -155,31 +175,21 @@ const TenderOffers: React.FC = () => {
       });
     }
 
-    if (proposalSubmissionEnd.value && proposalReviewEnd.value) {
+    if (proposalSubmissionEnd.value && proposalReviewStart.value) {
       newEvents.push({
         id: 3,
         title: "Evaluation Phase",
-        start: new Date(proposalSubmissionEnd.value as string),
+        start: new Date(proposalReviewStart.value as string),
         end: new Date(proposalReviewEnd.value as string),
-      });
-    }
-
-    if (proposalReviewEnd.value && offerActiveEnd.value) {
-      newEvents.push({
-        id: 4,
-        title: "Award Announcement Phase",
-        start: new Date(proposalReviewEnd.value as string),
-        end: new Date(offerActiveEnd.value as string),
       });
     }
 
     setEvents(newEvents);
   }, [
-    offerForm.offerActiveStart.value,
     offerForm.proposalSubmissionStart.value,
     offerForm.proposalSubmissionEnd.value,
     offerForm.proposalReviewEnd.value,
-    offerForm.offerActiveEnd.value,
+    offerForm.proposalReviewStart.value,
   ]);
 
   const inputChangeHandler = (
@@ -215,23 +225,14 @@ const TenderOffers: React.FC = () => {
   const validateDate = (name: string, date: Dayjs | null): string => {
     if (!date) return "Date is required";
 
-    // Ensure date is in the future
     if (!date.isAfter(dayjs())) {
       return "Date must be after current date";
     }
 
-    // Validate the chronological order of dates
     switch (name) {
-      case "offerActiveStart":
-        return ""; // This is the first date, no previous date to compare with
-
       case "proposalSubmissionStart":
-        const offerActiveStartDate = offerForm.offerActiveStart.value
-          ? dayjs(offerForm.offerActiveStart.value)
-          : null;
-
-        if (offerActiveStartDate && !isAfterDate(date, offerActiveStartDate)) {
-          return "Submission start must be after offer active start";
+        if (!isAfterDate(date, dayjs(new Date()))) {
+          return "Submission start must be after the current date";
         }
         return "";
 
@@ -251,17 +252,20 @@ const TenderOffers: React.FC = () => {
           : null;
 
         if (proposalEndDate && !isAfterDate(date, proposalEndDate)) {
-          return "Review end must be after submission end";
+          return "Reviews end must be after Reviews start";
         }
         return "";
 
-      case "offerActiveEnd":
-        const reviewEndDate = offerForm.proposalReviewEnd.value
-          ? dayjs(offerForm.proposalReviewEnd.value)
+      case "proposalReviewStart":
+        const proposalSubmissionEnd = offerForm.proposalSubmissionEnd.value
+          ? dayjs(offerForm.proposalSubmissionEnd.value)
           : null;
 
-        if (reviewEndDate && !isAfterDate(date, reviewEndDate)) {
-          return "Offer end must be after review end";
+        if (
+          proposalSubmissionEnd &&
+          !isAfterDate(date, proposalSubmissionEnd)
+        ) {
+          return "Reviews start must be after proposals end";
         }
         return "";
 
@@ -285,15 +289,13 @@ const TenderOffers: React.FC = () => {
     }));
   };
 
-  // Validate all dates when submitting the form
   const validateAllDates = (): boolean => {
     let isValid = true;
     const dateFields = [
-      "offerActiveStart",
       "proposalSubmissionStart",
       "proposalSubmissionEnd",
       "proposalReviewEnd",
-      "offerActiveEnd",
+      "proposalReviewStart",
     ];
 
     const updatedForm = { ...offerForm };
@@ -331,19 +333,197 @@ const TenderOffers: React.FC = () => {
     setFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = () => {
-    // Validate all fields including dates
+  const vlaidateOfferForm = () => {
+    let isValid = true;
+    const updated = { ...offerForm };
+
+    const textFields: Array<keyof OfferFormProps> = [
+      "title",
+      "description",
+      "budget",
+      "currency",
+      "category",
+    ];
+    textFields.forEach((name) => {
+      const field = updated[name];
+      // run custom validators (e.g. isRequired)
+      if (field.validators) {
+        for (const validator of field.validators) {
+          const { isValid: ok, errorMessage } = validator(field.value);
+          if (!ok) {
+            updated[name] = { ...field, error: errorMessage };
+            isValid = false;
+            return;
+          }
+        }
+      }
+      // catch any still‐empty values
+      if (
+        field.value === "" ||
+        field.value === undefined ||
+        field.value === null
+      ) {
+        updated[name] = { ...field, error: "This field is required" };
+        isValid = false;
+      }
+    });
+  };
+
+  const handleSubmit = async () => {
     if (!validateAllDates()) {
       return; // Stop submission if validation fails
     }
 
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!account) {
+      showFeedback(
+        "No connected wallet detected. Please connect your wallet to proceed.",
+        "error"
+      );
+      return;
+    }
+
+    const isTender = hasRole("TENDER", account);
+
+    if (!isTender) {
+      showFeedback("Tender permissions required for offer creation", "error");
+      return;
+    }
+
     setIsSubmitting(true);
-    // Submit logic here
-    setTimeout(() => {
+
+    try {
+      showFeedback(
+        "Intiating blockchain transaction to create the offer",
+        "info"
+      );
+
+      const subStartIso = offerForm.proposalSubmissionStart.value as string;
+      const subEndIso = offerForm.proposalSubmissionEnd.value as string;
+      const revStartIso = offerForm.proposalReviewStart.value as string;
+      const revEndIso = offerForm.proposalReviewEnd.value as string;
+
+      // we must use unix times on the smart contracts
+      const subStart = dayjs(subStartIso).unix();
+      const subEnd = dayjs(subEndIso).unix();
+      const revStart = dayjs(revStartIso).unix();
+      const revEnd = dayjs(revEndIso).unix();
+
+      await createOffer(subStart, subEnd, revStart, revEnd);
+
+      showFeedback("Offer created on‑chain. Transaction sent!", "success");
+    } catch (err: any) {
+      showFeedback(
+        err.msg || "something went wrong with creating the offer, try again",
+        "error"
+      );
       setIsSubmitting(false);
-      // Here you would typically call your API
-    }, 1500);
+    }
   };
+
+  useEffect(() => {
+    if (createOfferState.status === "Mining") {
+      showFeedback(`Waiting for the offer to be created`, "pending");
+    } else if (createOfferState.status === "Success") {
+      const tx = createOfferState.transaction;
+
+      if (!tx) {
+        showFeedback(
+          "Offer creation failed during off-chain synchronization",
+          "error"
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      // wait for transaction to happen
+      tx.wait().then((receipt) => {
+        // go through the logs and look for the created offers new address
+        const iface = factoryContract!.interface;
+        const event = receipt.logs
+          .map((log) => {
+            try {
+              return iface.parseLog(log);
+            } catch {
+              return null;
+            }
+          })
+          .find((parsed) => parsed?.name === "OfferCreated");
+
+        if (!event) {
+          showFeedback("Could not find OfferCreated event", "error");
+          setIsSubmitting(false);
+          return;
+        }
+
+        const newOfferAddress: string = event.args?.offerAddress;
+
+        // build the form data
+        const formData = new FormData();
+        formData.append("contractAddress", newOfferAddress);
+        formData.append("title", offerForm.title.value as string);
+        formData.append("description", offerForm.description.value as string);
+        formData.append("budget", String(offerForm.budget.value));
+        formData.append("currency", offerForm.currency.value as string);
+        formData.append("category", offerForm.category.value as string);
+        formData.append(
+          "proposalSubmissionStart",
+          offerForm.proposalSubmissionStart.value as string
+        );
+        formData.append(
+          "proposalSubmissionEnd",
+          offerForm.proposalSubmissionEnd.value as string
+        );
+        formData.append(
+          "proposalReviewStart",
+          offerForm.proposalReviewStart.value as string
+        );
+        formData.append(
+          "proposalReviewEnd",
+          offerForm.proposalReviewEnd.value as string
+        );
+        files.forEach((file) => formData.append("documents", file, file.name));
+
+        fetch(`${apiUrl}/tender/offer`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        })
+          .then(async (res) => {
+            const resData = await res.json();
+
+            if (resData.error) throw resData.error;
+
+            showFeedback("Offer has been successfully created!", "success");
+          })
+          .catch((err: any) => {
+            showFeedback(err.msg || "Failed to sync offer to server.", "error");
+          })
+          .finally(() => {
+            setIsSubmitting(false);
+            resetStates();
+          });
+      });
+    }
+
+    if (
+      createOfferState.status === "Fail" ||
+      createOfferState.status === "Exception"
+    ) {
+      showFeedback(
+        createOfferState.errorMessage ||
+          "Offer creation failed failed. Transaction was not completed.",
+        "error"
+      );
+      setIsSubmitting(false);
+      resetStates();
+    }
+  }, [createOfferState, token, apiUrl, showFeedback]);
 
   const handleCancel = () => {
     setOfferForm({
@@ -352,15 +532,14 @@ const TenderOffers: React.FC = () => {
       budget: { value: 0, error: "", validators: [isRequired] },
       currency: { value: "", error: "", validators: [isRequired] },
       category: { value: "", error: "", validators: [isRequired] },
-      offerActiveStart: { value: "", error: "", validators: [isRequired] },
       proposalSubmissionStart: {
         value: "",
         error: "",
         validators: [isRequired],
       },
       proposalSubmissionEnd: { value: "", error: "", validators: [isRequired] },
+      proposalReviewStart: { value: "", error: "", validators: [isRequired] },
       proposalReviewEnd: { value: "", error: "", validators: [isRequired] },
-      offerActiveEnd: { value: "", error: "", validators: [isRequired] },
     });
     setFiles([]);
     setEvents([]);
@@ -408,7 +587,7 @@ const TenderOffers: React.FC = () => {
             <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
               <TextField
                 fullWidth
-                label="Tender Title"
+                label="Title"
                 name="title"
                 value={offerForm.title.value || ""}
                 onChange={inputChangeHandler}
@@ -524,27 +703,6 @@ const TenderOffers: React.FC = () => {
                 >
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                     <DateTimePicker
-                      label="Offer Active Start"
-                      value={
-                        offerForm.offerActiveStart.value
-                          ? dayjs(offerForm.offerActiveStart.value)
-                          : null
-                      }
-                      onChange={(date) =>
-                        handleDateChange("offerActiveStart", date)
-                      }
-                      slotProps={{
-                        textField: {
-                          fullWidth: true,
-                          size: "small",
-                          error: !!offerForm.offerActiveStart.error,
-                          helperText: offerForm.offerActiveStart.error || "",
-                        },
-                      }}
-                      shouldDisableDate={shouldDisableDate}
-                      sx={{ minWidth: 250, flexGrow: 1 }}
-                    />
-                    <DateTimePicker
                       label="Proposal Submission Start"
                       value={
                         offerForm.proposalSubmissionStart.value
@@ -589,6 +747,28 @@ const TenderOffers: React.FC = () => {
                       sx={{ minWidth: 250, flexGrow: 1 }}
                     />
                     <DateTimePicker
+                      label="Proposal Review Start"
+                      value={
+                        offerForm.proposalReviewStart.value
+                          ? dayjs(offerForm.proposalReviewStart.value)
+                          : null
+                      }
+                      onChange={(date) =>
+                        handleDateChange("proposalReviewStart", date)
+                      }
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          size: "small",
+                          error: !!offerForm.proposalReviewStart.error,
+                          helperText: offerForm.proposalReviewStart.error || "",
+                        },
+                      }}
+                      shouldDisableDate={shouldDisableDate}
+                      sx={{ minWidth: 250, flexGrow: 1 }}
+                    />
+
+                    <DateTimePicker
                       label="Proposal Review End"
                       value={
                         offerForm.proposalReviewEnd.value
@@ -604,27 +784,6 @@ const TenderOffers: React.FC = () => {
                           size: "small",
                           error: !!offerForm.proposalReviewEnd.error,
                           helperText: offerForm.proposalReviewEnd.error || "",
-                        },
-                      }}
-                      shouldDisableDate={shouldDisableDate}
-                      sx={{ minWidth: 250, flexGrow: 1 }}
-                    />
-                    <DateTimePicker
-                      label="Offer Active End"
-                      value={
-                        offerForm.offerActiveEnd.value
-                          ? dayjs(offerForm.offerActiveEnd.value)
-                          : null
-                      }
-                      onChange={(date) =>
-                        handleDateChange("offerActiveEnd", date)
-                      }
-                      slotProps={{
-                        textField: {
-                          fullWidth: true,
-                          size: "small",
-                          error: !!offerForm.offerActiveEnd.error,
-                          helperText: offerForm.offerActiveEnd.error || "",
                         },
                       }}
                       shouldDisableDate={shouldDisableDate}

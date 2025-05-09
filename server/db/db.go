@@ -40,7 +40,6 @@ func ConnectDB() {
 		&models.Offer{},
 		&models.ContractRules{},
 		&models.Document{},
-
 		&models.Bid{},
 		&models.ExpertEvaluation{},
 		&models.Sector{},

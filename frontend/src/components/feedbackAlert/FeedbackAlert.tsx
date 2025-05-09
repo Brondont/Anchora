@@ -70,6 +70,7 @@ const FeedbackAlert: React.FC = () => {
         <Alert
           severity={currentStatus === "pending" ? "info" : currentStatus}
           icon={getStatusIcon()}
+          variant="filled"
         >
           <AlertTitle>{getStatusTitle()}</AlertTitle>
           {feedback}

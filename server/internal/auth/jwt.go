@@ -2,7 +2,6 @@ package auth
 
 import (
 	"errors"
-	"strconv"
 	"time"
 
 	"github.com/Brondont/trust-api/config"
@@ -18,7 +17,7 @@ const (
 
 // AuthClaims defines the claims for the authentication token.
 type AuthClaims struct {
-	UserID    string   `json:"userID"`
+	UserID    uint     `json:"userID"`
 	Roles     []string `json:"roles"`
 	TokenType string   `json:"type"`
 	jwt.RegisteredClaims
@@ -48,7 +47,7 @@ func CreateAuthToken(userID uint, roles []models.Role, isActive bool) (string, e
 	}
 	// Build the claims using the AuthClaims struct
 	claims := AuthClaims{
-		UserID:    strconv.FormatUint(uint64(userID), 10),
+		UserID:    userID,
 		Roles:     roleNames,
 		TokenType: "auth",
 		RegisteredClaims: jwt.RegisteredClaims{

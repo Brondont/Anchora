@@ -7,10 +7,17 @@ import {
 } from "@usedapp/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Interface, keccak256, toUtf8Bytes } from "ethers/lib/utils";
+import type { TransactionReceipt } from "@ethersproject/providers";
 
 const ABI = new Interface([
   {
-    inputs: [],
+    inputs: [
+      {
+        internalType: "address",
+        name: "initialAdmin",
+        type: "address",
+      },
+    ],
     stateMutability: "nonpayable",
     type: "constructor",
   },
@@ -201,7 +208,28 @@ const ABI = new Interface([
     type: "function",
   },
   {
-    inputs: [],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "submissionStart",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "submissionEnd",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "reviewStart",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "reviewEnd",
+        type: "uint256",
+      },
+    ],
     name: "createOffer",
     outputs: [],
     stateMutability: "nonpayable",
@@ -325,17 +353,23 @@ const ABI = new Interface([
   },
 ]);
 
-const factoryAddress = localStorage.getItem("factoryAddress");
+const factoryAddress = import.meta.env.VITE_OFFER_FACTORY_ADDRESS || "";
 
 export interface UseOfferFactory {
   factoryContract: Contract | null;
   grantRole: (role: string, address: string) => Promise<void>;
   revokeRole: (role: string, address: string) => Promise<void>;
   hasRole: (role: string, address: string) => Promise<boolean>;
-  createOffer: () => Promise<void>;
+  createOffer: (
+    submissionStart: number,
+    submissionEnd: number,
+    reviewStart: number,
+    reviewEnd: number
+  ) => Promise<void>;
   error?: UseOfferError;
   grantState: TransactionStatus;
   revokeState: TransactionStatus;
+  createOfferState: TransactionStatus;
   resetStates: () => void;
 }
 
@@ -346,12 +380,34 @@ interface UseOfferError {
 export function useOfferFactory(): UseOfferFactory {
   const { account } = useEthers();
   const [error, setError] = useState<UseOfferError>();
+  const [factoryContract, setFactoryContract] = useState<Contract | null>(null);
   const signer = useSigner();
+  const provider = useMemo(() => signer?.provider, [signer]);
 
-  const factoryContract = useMemo(() => {
-    if (!signer || !factoryAddress) return null;
-    return new Contract(factoryAddress, ABI, signer);
-  }, [signer, factoryAddress]);
+  useEffect(() => {
+    if (!provider || !factoryAddress) {
+      setFactoryContract(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        const code = await provider.getCode(factoryAddress);
+        if (code === "0x") {
+          throw new Error(
+            "No smart contract found at the given address, please refersh your page"
+          );
+        }
+        // If code exists, instantiate the Contract
+        const newContract = new Contract(factoryAddress, ABI, signer);
+        setFactoryContract(newContract);
+      } catch (err: any) {
+        console.error("Contract existence check failed:", err);
+        setError({ msg: err.message });
+        setFactoryContract(null);
+      }
+    })();
+  }, [provider, signer, factoryAddress]);
 
   const {
     send: grant,
@@ -364,7 +420,7 @@ export function useOfferFactory(): UseOfferFactory {
     resetState: resetRevokeState,
   } = useContractFunction(factoryContract, "revokeRole");
   const {
-    send: createOffer,
+    send: createOfferSend,
     state: createOfferState,
     resetState: resetOfferState,
   } = useContractFunction(factoryContract, "createOffer");
@@ -397,6 +453,8 @@ export function useOfferFactory(): UseOfferFactory {
         throw new Error("Invalid role name");
     }
   }, []);
+
+  // role managment handling
 
   const handleRoleAction = useCallback(
     async (action: "grant" | "revoke", roleName: string, address: string) => {
@@ -440,11 +498,34 @@ export function useOfferFactory(): UseOfferFactory {
 
   const hasRole = useCallback(
     async (roleName: string, address: string) => {
-      if (!factoryContract) throw new Error("Contract not initialized");
+      if (!factoryContract) {
+        setError({ msg: "contract is not intialized" });
+        return false;
+      }
       const role = getRoleBytes32(roleName);
       return await factoryContract.hasRole(role, address);
     },
     [factoryContract, getRoleBytes32]
+  );
+
+  // offer creation handling
+  const createOffer = useCallback(
+    async (
+      submissionStart: number,
+      submissionEnd: number,
+      reviewStart: number,
+      reviewEnd: number
+    ) => {
+      if (!factoryContract) throw new Error("Contract not initialized");
+      // Forward the four args into the solidity function
+      await createOfferSend(
+        submissionStart,
+        submissionEnd,
+        reviewStart,
+        reviewEnd
+      );
+    },
+    [factoryContract, createOfferSend]
   );
 
   return {
@@ -452,11 +533,8 @@ export function useOfferFactory(): UseOfferFactory {
     grantRole,
     revokeRole,
     hasRole,
-    createOffer: async () => {
-      if (!createOffer)
-        throw new Error("Create offer function not initialized");
-      await createOffer();
-    },
+    createOffer,
+    createOfferState,
     error,
     grantState,
     revokeState,

@@ -13,6 +13,7 @@ func SetupRoutes(router *mux.Router) {
 	adminHandler := handlers.NewAdminHandler()
 	generalHandler := handlers.NewGeneralHandler()
 	userHandler := handlers.NewUserHandler()
+	tenderHandler := handlers.NewTenderHandler()
 
 	// General Routes (accessible without role restrictions)
 	router.HandleFunc("/user-profile/{userID}", generalHandler.GetUserProfile).Methods("GET")
@@ -42,6 +43,9 @@ func SetupRoutes(router *mux.Router) {
 	router.HandleFunc("/roles", auth.RequireRole(adminHandler.CreateRole, "admin")).Methods("POST")
 	router.HandleFunc("/roles/{roleName}", auth.RequireRole(adminHandler.UpdateRole, "admin")).Methods("PUT")
 	router.HandleFunc("/roles/{roleName}", auth.RequireRole(adminHandler.DeleteRole, "admin")).Methods("DELETE")
+
+	// tender roles
+	router.HandleFunc("/tender/offer", auth.RequireRole(tenderHandler.PostOffer, "tender")).Methods("POST")
 }
 
 func SetupStaticRoutes(router *mux.Router) {
