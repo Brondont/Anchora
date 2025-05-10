@@ -98,10 +98,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   return (
     <Box sx={{ mt: 2 }}>
-      <Typography variant="subtitle1" fontWeight={500} sx={{ mb: 1 }}>
-        Supporting Documents
-      </Typography>
-
       {/* Fixed border styling for the upload box */}
       <Box
         component="label"

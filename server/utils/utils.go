@@ -145,7 +145,7 @@ func ParseMultipartForm(r *http.Request, maxMemory int64) (*MultiPartFormData, e
 		data.Model = modelHeader[0]
 	}
 
-	if files, ok := r.MultipartForm.File["images"]; ok {
+	if files, ok := r.MultipartForm.File["documents"]; ok {
 		data.Files = append(data.Files, files...)
 	}
 

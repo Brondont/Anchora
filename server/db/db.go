@@ -37,14 +37,19 @@ func ConnectDB() {
 	if err := db.AutoMigrate(
 		&models.Role{},
 		&models.User{},
-		&models.Offer{},
-		&models.ContractRules{},
-		&models.Document{},
-		&models.Bid{},
-		&models.ExpertEvaluation{},
+
 		&models.Sector{},
+		&models.Qualification{},
+
+		&models.UserQualification{},
+
+		&models.Document{},
+
+		&models.Offer{},
+		&models.Proposal{},
+		&models.ExpertEvaluation{},
 	); err != nil {
-		log.Printf("Migration failed %v", err)
+		log.Fatalf("Migration failed: %v", err)
 	}
 
 	DB = DBInstance{

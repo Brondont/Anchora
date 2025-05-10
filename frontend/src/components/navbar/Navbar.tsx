@@ -125,9 +125,8 @@ const Navbar: React.FC<NavbarProps> = ({
   toggleDarkMode = () => {},
   isDarkMode = false,
 }) => {
-  const [isHidden, setIsHidden] = useState<boolean>(false);
+  const [isVisible, setIsVisible] = useState<boolean>(true);
   const [isFixed, setIsFixed] = useState<boolean>(false);
-  const [navbarHeight, setNavbarHeight] = useState(0);
   const [lastScrollY, setLastScrollY] = useState<number>(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchDrawerOpen, setSearchDrawerOpen] = useState(false);
@@ -199,29 +198,31 @@ const Navbar: React.FC<NavbarProps> = ({
     setAnchorEl(null);
   };
 
-  // for updating the icon fo log in after the user logs in
-  useEffect(() => {}, [isAuth]);
-
+  // Improved scroll handling - key changes to make it smooth
   useEffect(() => {
     const handleScroll = () => {
-      const currentNavHeight = navbarRef.current?.offsetHeight || 0;
+      const scrollY = window.scrollY;
+      const navHeight = navbarRef.current?.offsetHeight || 0;
 
-      if (window.scrollY > currentNavHeight) {
+      // Determine if navbar should be fixed
+      if (scrollY > navHeight) {
         setIsFixed(true);
       } else {
         setIsFixed(false);
       }
 
-      if (window.scrollY > lastScrollY && window.scrollY > currentNavHeight) {
-        setIsHidden(true);
+      // Determine if navbar should be visible
+      // Only hide when scrolling down AND past navbar height
+      if (scrollY > lastScrollY && scrollY > navHeight) {
+        setIsVisible(false);
       } else {
-        setIsHidden(false);
+        setIsVisible(true);
       }
-      setLastScrollY(window.scrollY);
+
+      setLastScrollY(scrollY);
     };
 
-    setNavbarHeight(navbarRef.current?.offsetHeight || 0);
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY]);
 
@@ -316,7 +317,7 @@ const Navbar: React.FC<NavbarProps> = ({
           }}
         >
           <Typography color="primary" variant="h6" sx={{ fontWeight: "bold" }}>
-            Trust
+            Anchora
           </Typography>
           <IconButton onClick={() => setMobileMenuOpen(false)}>
             <CloseIcon />
@@ -477,7 +478,7 @@ const Navbar: React.FC<NavbarProps> = ({
               variant="h5"
               sx={{ fontWeight: "bold" }}
             >
-              Trust
+              Anchora
             </Typography>
           </Box>
         </Box>
@@ -669,20 +670,31 @@ const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      {isFixed && <Box sx={{ height: navbarHeight }} />}
+      {/* Fixed spacer - only render when navbar is fixed */}
+      {isFixed && (
+        <Box
+          sx={{
+            height: navbarRef.current?.offsetHeight || 0,
+            transition: "height 0.3s ease",
+          }}
+        />
+      )}
+
+      {/* Navbar container */}
       <Box
         ref={navbarRef}
         sx={{
           width: "100%",
           zIndex: 1200,
-          transition: "transform 0.3s ease",
-          transform:
-            isFixed && isHidden ? "translateY(-100%)" : "translateY(0)",
           position: isFixed ? "fixed" : "relative",
           top: 0,
+          transform:
+            isFixed && !isVisible ? "translateY(-100%)" : "translateY(0)",
+          transition: "transform 0.3s ease",
+          boxShadow: isFixed ? 1 : 0,
         }}
       >
-        <AppBar position="static" elevation={0}>
+        <AppBar position="static" elevation={isFixed ? 4 : 0}>
           {renderDesktopTopBar()}
           {isMobile ? (
             <>
@@ -712,7 +724,7 @@ const Navbar: React.FC<NavbarProps> = ({
                       color="primary"
                       sx={{ fontWeight: "bold" }}
                     >
-                      Trust
+                      Anchora
                     </Typography>
                   </Link>
                   {account && showNetworkWarning && (

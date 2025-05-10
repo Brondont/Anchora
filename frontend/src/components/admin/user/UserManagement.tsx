@@ -20,8 +20,8 @@ import {
   ListItemText,
   ListItemIcon,
   Button,
-  CircularProgress,
 } from "@mui/material";
+import { Backdrop, CircularProgress } from "@mui/material";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
@@ -393,6 +393,12 @@ const UserManagement: React.FC = () => {
         onClose={() => setOpenRolesDialog(false)}
         user={selectedUser}
       />
+      <Backdrop
+        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        open={isProcessing}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
     </Box>
   );
 };

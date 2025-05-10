@@ -4,11 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
-	"time"
 
 	"github.com/Brondont/trust-api/db"
 	"github.com/Brondont/trust-api/internal/auth"
+	"github.com/Brondont/trust-api/middleware"
 	"github.com/Brondont/trust-api/models"
 	"github.com/Brondont/trust-api/utils"
 )
@@ -30,15 +29,20 @@ func (h *TenderHandler) PostOffer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := claims.UserID
-
-	formData, err := utils.ParseMultipartForm(r, 32<<20) // 32MB max size
+	formData, err := utils.ParseMultipartForm(r, 32<<20)
 	if err != nil {
 		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid form data: %w", err))
 		return
 	}
 
-	// Start a transaction
+	// Validate form data using middleware
+	offerForm, validationErrors := middleware.ValidateOfferForm(formData.Fields)
+	if len(validationErrors) > 0 {
+		utils.WriteJson(w, http.StatusBadRequest, middleware.ErrorResponse{Error: validationErrors})
+		return
+	}
+
+	// Start transaction
 	tx := db.DB.DB.Begin()
 	if tx.Error != nil {
 		utils.WriteError(w, http.StatusInternalServerError, tx.Error)
@@ -50,72 +54,39 @@ func (h *TenderHandler) PostOffer(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Parse form fields
-	contractAddress := formData.Fields["contractAddress"][0]
-	title := formData.Fields["title"][0]
-	summary := formData.Fields["description"][0]
-	budgetStr := formData.Fields["budget"][0]
-	currency := formData.Fields["currency"][0]
-
-	// Parse budget as float
-	budget, err := strconv.ParseFloat(budgetStr, 64)
-	if err != nil {
+	// Verify sector exists
+	var sectorCount int64
+	if result := tx.Model(&models.Sector{}).Where("id = ?", offerForm.SectorID).Count(&sectorCount); result.Error != nil {
 		tx.Rollback()
-		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid budget value: %w", err))
+		utils.WriteError(w, http.StatusInternalServerError, result.Error)
 		return
 	}
 
-	// Parse time fields
-	parseTime := func(fieldName string) (time.Time, error) {
-		if len(formData.Fields[fieldName]) == 0 {
-			return time.Time{}, fmt.Errorf("%s is required", fieldName)
-		}
-		return time.Parse(time.RFC3339, formData.Fields[fieldName][0])
-	}
-
-	proposalSubmissionStart, err := parseTime("proposalSubmissionStart")
-	if err != nil {
+	if sectorCount == 0 {
 		tx.Rollback()
-		utils.WriteError(w, http.StatusBadRequest, err)
+		utils.WriteError(w, http.StatusBadRequest, errors.New("sector not found"))
 		return
 	}
 
-	proposalSubmissionEnd, err := parseTime("proposalSubmissionEnd")
-	if err != nil {
-		tx.Rollback()
-		utils.WriteError(w, http.StatusBadRequest, err)
-		return
-	}
-
-	proposalReviewStart, err := parseTime("proposalReviewStart")
-	if err != nil {
-		tx.Rollback()
-		utils.WriteError(w, http.StatusBadRequest, err)
-		return
-	}
-
-	proposalReviewEnd, err := parseTime("proposalReviewEnd")
-	if err != nil {
-		tx.Rollback()
-		utils.WriteError(w, http.StatusBadRequest, err)
-		return
-	}
-
-	// Create offer model
+	// Create offer payload
 	offerPayload := models.Offer{
-		Title:                   title,
-		Summary:                 summary,
-		Budget:                  budget,
-		Currency:                currency,
-		ContractAddress:         contractAddress,
-		ProposalSubmissionStart: proposalSubmissionStart,
-		ProposalSubmissionEnd:   proposalSubmissionEnd,
-		ProposalReviewStart:     proposalReviewStart,
-		ProposalReviewEnd:       proposalReviewEnd,
-		CreatedBy:               userID,
+		Title:                   offerForm.Title,
+		TenderNumber:            offerForm.TenderNumber,
+		Description:             offerForm.Description,
+		Budget:                  offerForm.Budget,
+		Currency:                offerForm.Currency,
+		SectorID:                offerForm.SectorID,
+		ContractAddress:         offerForm.ContractAddress,
+		MinQualificationLevel:   offerForm.MinQualificationLevel,
+		ProposalSubmissionStart: offerForm.ProposalSubmissionStart,
+		ProposalSubmissionEnd:   offerForm.ProposalSubmissionEnd,
+		ProposalReviewStart:     offerForm.ProposalReviewStart,
+		ProposalReviewEnd:       offerForm.ProposalReviewEnd,
+		CreatedBy:               claims.UserID,
+		Status:                  "Open",
 	}
 
-	// Save offer to the database within transaction
+	// Save offer
 	result := tx.Create(&offerPayload)
 	if result.Error != nil {
 		tx.Rollback()

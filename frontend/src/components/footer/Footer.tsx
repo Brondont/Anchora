@@ -18,7 +18,7 @@ const Footer: React.FC = () => {
   return (
     <Box
       sx={{
-        bgcolor: "primary.main",
+        bgcolor: "primary.dark",
         color: "primary.contrastText",
         py: 6,
         position: "relative",
@@ -32,14 +32,11 @@ const Footer: React.FC = () => {
           position: "absolute",
           bottom: 20,
           right: 20,
-          bgcolor: "secondary.main",
           color: "white",
         }}
       >
         <ArrowUpwardIcon />
       </IconButton>
-
-      <Divider sx={{ bgcolor: "primary.contrastText", mb: 4 }} />
 
       <Box
         sx={{
