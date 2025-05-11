@@ -7,7 +7,6 @@ import {
 } from "@usedapp/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Interface, keccak256, toUtf8Bytes } from "ethers/lib/utils";
-import type { TransactionReceipt } from "@ethersproject/providers";
 
 const ABI = new Interface([
   {

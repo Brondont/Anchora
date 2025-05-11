@@ -12,6 +12,7 @@
 #public
 /public/*
 
+/authenticated/*
 
 
 # Ignore environment files

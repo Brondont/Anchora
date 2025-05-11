@@ -1,0 +1,26 @@
+@startuml expert-usecase
+left to right direction
+skinparam ArrowFontSize 10
+
+' -- Actors --
+actor "Expert" as Expert
+actor "Metamask Wallet" as Metamask <<external system>>
+rectangle "Blockchain" as Blockchain <<external system>>
+
+' -- Use Cases --
+usecase "Evaluate Proposal" as EvaluateProposal
+usecase "Authenticate & Sign\n(via Metamask)" as AuthMeta
+usecase "Push Evaluation" as PushEval
+
+' -- Actor-Use Case Links --
+Expert --> EvaluateProposal
+
+' -- Include and Extend Relationships --
+EvaluateProposal ..> AuthMeta : <<include>>
+EvaluateProposal ..> PushEval : <<include>>
+
+' -- Blockchain connections --
+PushEval <-- Blockchain
+Metamask --> AuthMeta
+
+@enduml

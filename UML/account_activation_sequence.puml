@@ -1,0 +1,70 @@
+@startuml account_activation_sequence
+
+actor User
+participant "Email" as Email
+participant "Activation Frontend" as Frontend
+participant "Server" as Server
+database "Database" as DB
+
+title Account Activation Process
+
+== Normal Flow ==
+User -> Email: Click activation link
+Email -> Frontend: Redirect to activation page with token
+Frontend -> Frontend: Display password creation form
+User -> Frontend: Enter and confirm password
+Frontend -> Server: POST /api/v1/user/activate
+note right: Includes activation token and password
+activate Server
+
+Server -> Server: Validate token
+alt Token is valid
+    Server -> Server: Validate password strength
+    alt Password meets requirements
+        Server -> DB: Update user status to "active"\nand store hashed password
+        DB --> Server: Confirm update
+        Server --> Frontend: 200 OK (Account activated)
+        Frontend --> User: Display success message\nwith login instructions
+    else Password too weak
+        Server --> Frontend: 400 Bad Request (Password too weak)
+        Frontend --> User: Show password requirements
+    end
+else Token invalid or expired
+    Server --> Frontend: 401 Unauthorized (Invalid/expired token)
+    Frontend --> User: Show error with option\nto request new activation link
+end
+
+deactivate Server
+
+== Expired Token Scenario ==
+User -> Email: Click activation link (expired)
+Email -> Frontend: Redirect to activation page with token
+Frontend -> Server: Verify token status
+activate Server
+Server -> Server: Check token validity
+Server --> Frontend: 401 Unauthorized (Token expired)
+deactivate Server
+Frontend -> Frontend: Show expired token message
+User -> Frontend: Request new activation link
+Frontend -> Server: POST /api/v1/user/request-activation
+activate Server
+Server -> DB: Check user exists with pending status
+DB --> Server: Confirm user exists
+Server -> Server: Generate new activation token
+Server -> DB: Update activation token
+DB --> Server: Confirm update
+Server -> "Google SMTP": Send new activation email
+"Google SMTP" --> Server: Confirm email sent
+Server --> Frontend: 200 OK (New activation email sent)
+Frontend --> User: Display confirmation message
+deactivate Server
+
+== Password Mismatch (Client-side validation) ==
+User -> Email: Click activation link
+Email -> Frontend: Redirect to activation page with token
+Frontend -> Frontend: Display password creation form
+User -> Frontend: Enter mismatched passwords
+Frontend -> Frontend: Detect password mismatch
+Frontend --> User: Show error: "Passwords don't match"
+
+@enduml

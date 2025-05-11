@@ -17,7 +17,7 @@ import { useParams } from "react-router-dom";
 import { UserProps } from "../../types";
 
 interface UserPageProps {
-  activeUser: UserProps | null;
+  activeUser: UserProps | undefined;
 }
 
 const ProfilePage: React.FC<UserPageProps> = ({ activeUser }) => {

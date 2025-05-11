@@ -1,0 +1,114 @@
+@startuml offer_creation_sequence
+
+actor Tender
+participant "Tender Frontend" as Frontend
+participant "MetaMask" as MetaMask
+participant "Smart Contract\n(OfferFactory)" as Contract
+participant "Blockchain" as Blockchain
+participant "Server" as Server
+database "Database" as DB
+
+title Offer Creation Process
+
+== Normal Flow ==
+Tender -> Frontend: Fill offer creation form
+Frontend -> Frontend: Validate form data
+alt Form data valid
+    Frontend -> MetaMask: Request transaction signature
+    activate MetaMask
+    MetaMask -> Tender: Prompt to sign transaction
+    Tender -> MetaMask: Confirm and sign
+    MetaMask -> Contract: Send signed transaction
+    activate Contract
+    Contract -> Blockchain: Submit transaction
+    activate Blockchain
+    Blockchain --> Contract: Transaction included in block
+    deactivate Blockchain
+    Contract --> MetaMask: Return transaction hash
+    deactivate Contract
+    MetaMask --> Frontend: Return transaction success
+    deactivate MetaMask
+    Frontend -> Server: POST /api/v1/tender/offer
+    note right: Includes transaction hash\nand offer details
+    activate Server
+    Server -> Blockchain: Verify transaction confirmation
+    Blockchain --> Server: Confirm transaction
+    Server -> Server: Validate offer data
+    Server -> DB: Store offer details
+    DB --> Server: Confirm storage
+    Server --> Frontend: 201 Created (Offer created)
+    Frontend --> Tender: Display success message
+    deactivate Server
+else Form data invalid
+    Frontend --> Tender: Display validation errors
+end
+
+== Insufficient Funds Scenario ==
+Tender -> Frontend: Fill offer creation form
+Frontend -> Frontend: Validate form data
+Frontend -> MetaMask: Request transaction signature
+activate MetaMask
+MetaMask -> MetaMask: Check wallet balance
+MetaMask -> Tender: Display insufficient funds error
+Tender -> MetaMask: Cancel transaction
+MetaMask --> Frontend: Transaction cancelled
+deactivate MetaMask
+Frontend --> Tender: Display "Transaction failed:\nInsufficient funds" message
+
+== Network Disconnection During Blockchain Confirmation ==
+Tender -> Frontend: Fill offer creation form
+Frontend -> MetaMask: Request transaction signature
+activate MetaMask
+Tender -> MetaMask: Confirm and sign
+MetaMask -> Contract: Send signed transaction
+Contract -> Blockchain: Submit transaction
+MetaMask --> Frontend: Return transaction hash
+deactivate MetaMask
+Frontend -> Server: POST /api/v1/tender/offer
+activate Server
+Server -> Blockchain: Verify transaction confirmation
+note right: Network disconnection occurs
+Server -> Server: Set timeout for confirmation
+Server -> Server: Queue task to check later
+Server --> Frontend: 202 Accepted (Processing)
+Frontend --> Tender: Display "Offer submitted,\nconfirmation pending" message
+deactivate Server
+
+== Later Confirmation Check ==
+Server -> Server: Background process checks\npending transactions
+Server -> Blockchain: Re-check transaction status
+alt Transaction confirmed
+    Blockchain --> Server: Confirm transaction
+    Server -> DB: Store offer details
+    DB --> Server: Confirm storage
+    Server -> Server: Update offer status to "active"
+else Transaction failed
+    Blockchain --> Server: Transaction failed/not found
+    Server -> Server: Update offer status to "failed"
+    Server -> Frontend: Push notification\n(if websocket connected)
+    Frontend --> Tender: Display error notification with\noption to retry
+end
+
+== Database Error After Blockchain Confirmation ==
+Tender -> Frontend: Fill offer creation form
+Frontend -> MetaMask: Request transaction signature
+activate MetaMask
+Tender -> MetaMask: Confirm and sign
+MetaMask -> Contract: Send signed transaction
+Contract -> Blockchain: Submit transaction
+Blockchain --> Contract: Transaction included in block
+Contract --> MetaMask: Return transaction hash
+MetaMask --> Frontend: Return transaction success
+deactivate MetaMask
+Frontend -> Server: POST /api/v1/tender/offer
+activate Server
+Server -> Blockchain: Verify transaction confirmation
+Blockchain --> Server: Confirm transaction
+Server -> DB: Store offer details
+DB --> Server: Database error
+Server -> Server: Log error with transaction details\nfor manual reconciliation
+Server --> Frontend: 500 Internal Server Error
+Frontend --> Tender: Display error with transaction hash\nfor reference and support contact
+deactivate Server
+
+@enduml

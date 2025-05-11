@@ -1,0 +1,37 @@
+@startuml tender-usecase
+left to right direction
+skinparam ArrowFontSize 10
+
+' -- Actors --
+actor "Tender" as Tender
+actor "Metamask Wallet" as Metamask <<external system>>
+rectangle "Blockchain" as Blockchain <<external system>>
+
+' -- Use Cases --
+usecase "Create Offer" as CreateOffer
+usecase "Close Offer" as CloseOffer
+usecase "Set Offer Deadline" as OfferDeadline
+usecase "Attach Documentation" as OfferDocs
+usecase "Define Offer Conditions" as OfferConditions
+usecase "Authenticate & Sign\n(via Metamask)" as AuthMeta
+usecase "Push Offer" as PushOffer
+
+' -- Actor-Use Case Links --
+Tender --> CreateOffer
+Tender --> CloseOffer
+
+' -- Include and Extend Relationships --
+CreateOffer ..> OfferDeadline : <<include>>
+CreateOffer ..> OfferDocs : <<include>>
+CreateOffer ..> OfferConditions : <<include>>
+CreateOffer ..> AuthMeta : <<include>>
+CreateOffer ..> PushOffer : <<include>>
+
+CloseOffer ..> AuthMeta : <<include>>
+
+' -- Blockchain connections --
+PushOffer <-- Blockchain
+CloseOffer <-- Blockchain
+Metamask --> AuthMeta
+
+@enduml

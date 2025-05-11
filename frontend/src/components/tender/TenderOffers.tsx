@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useState, useEffect } from "react";
+import React, { ChangeEvent, useState, useEffect, useCallback } from "react";
 import {
   Box,
   Card,
@@ -16,12 +16,16 @@ import {
   IconButton,
   Tooltip,
   FormHelperText,
+  Autocomplete,
+  Backdrop,
+  CircularProgress,
 } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { Calendar, dayjsLocalizer } from "react-big-calendar";
+import { State } from "country-state-city";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import dayjs, { Dayjs } from "dayjs";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
@@ -108,6 +112,7 @@ const TenderOffers: React.FC = () => {
     budget: { value: 0, error: "", validators: [isRequired] },
     sector: { value: 0, error: "", validators: [isRequired] },
     minQualificationLevel: { value: 0, error: "", validators: [isRequired] },
+    location: { value: "", error: "", validators: [isRequired] },
     currency: { value: "", error: "", validators: [isRequired] },
     tenderNumber: { value: "", error: "", validators: [isRequired] },
     proposalSubmissionStart: { value: "", error: "", validators: [isRequired] },
@@ -119,6 +124,9 @@ const TenderOffers: React.FC = () => {
   const [richTextDescription, setRichTextDescription] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sectorOptions, setSectorOptions] = useState<Sector[]>([]);
+  const [availableStates, setAvailableStates] = useState<
+    Array<{ name: string; isoCode: string }>
+  >([]);
   const [qualificationOptions, setQualificationOptions] = useState<
     Qualification[]
   >([]);
@@ -142,7 +150,7 @@ const TenderOffers: React.FC = () => {
   const token = localStorage.getItem("token");
   const apiUrl = import.meta.env.VITE_API_URL;
 
-  const fetchSectors = async () => {
+  const fetchSectors = useCallback(async () => {
     try {
       const res = await fetch(`${apiUrl}/sectors`, {
         method: "GET",
@@ -161,7 +169,7 @@ const TenderOffers: React.FC = () => {
         false
       );
     }
-  };
+  }, [apiUrl]);
 
   useEffect(() => {
     if (error) {
@@ -174,7 +182,10 @@ const TenderOffers: React.FC = () => {
 
   useEffect(() => {
     fetchSectors();
-  }, []);
+
+    const states = State.getStatesOfCountry("DZ");
+    setAvailableStates(states);
+  }, [fetchSectors]);
 
   useEffect(() => {
     const newEvents: CalendarEvent[] = [];
@@ -203,7 +214,7 @@ const TenderOffers: React.FC = () => {
       });
     }
 
-    if (proposalSubmissionEnd.value && proposalReviewStart.value) {
+    if (proposalReviewEnd.value && proposalReviewStart.value) {
       newEvents.push({
         id: 3,
         title: "Evaluation Phase",
@@ -391,6 +402,7 @@ const TenderOffers: React.FC = () => {
       "title",
       "budget",
       "currency",
+      "location",
       "sector",
       "tenderNumber",
     ];
@@ -531,6 +543,7 @@ const TenderOffers: React.FC = () => {
         formData.append("tenderNumber", offerForm.tenderNumber.value as string);
         formData.append("budget", String(offerForm.budget.value));
         formData.append("currency", offerForm.currency.value as string);
+        formData.append("location", offerForm.location.value as string);
         const selectedSector = sectorOptions.find(
           (sector) => sector.code === offerForm.sector.value
         );
@@ -612,6 +625,8 @@ const TenderOffers: React.FC = () => {
       description: { value: "", error: "", validators: [isRequired] },
       budget: { value: 0, error: "", validators: [isRequired] },
       currency: { value: "", error: "", validators: [isRequired] },
+
+      location: { value: "", error: "", validators: [isRequired] },
       sector: { value: "", error: "", validators: [isRequired] },
       tenderNumber: { value: "", error: "", validators: [isRequired] },
       minQualificationLevel: { value: "", error: "", validators: [isRequired] },
@@ -685,58 +700,48 @@ const TenderOffers: React.FC = () => {
                   sx={{ flexGrow: 1 }}
                 />
               </Box>
-              <TextField
-                fullWidth
-                label="Title"
-                name="title"
-                value={offerForm.title.value || ""}
-                onChange={inputChangeHandler}
-                error={!!offerForm.title.error}
-                helperText={
-                  offerForm.title.error ||
-                  "Enter a clear, concise title for your tender offer"
-                }
-                required
-              />
-
-              <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
-                <FormControl sx={{ flexGrow: 1, minWidth: "200px" }}>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    label="Budget"
-                    name="budget"
-                    value={offerForm.budget.value || ""}
-                    onChange={inputChangeHandler}
-                    error={!!offerForm.budget.error}
-                    helperText={
-                      offerForm.budget.error ||
-                      "Specify the budget allocated for this tender"
-                    }
-                    required
-                  />
-                </FormControl>
-
-                <FormControl
-                  sx={{ flexGrow: 1, minWidth: "200px" }}
-                  error={!!offerForm.currency.error}
+              <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                <TextField
+                  fullWidth
+                  label="Title"
+                  name="title"
+                  value={offerForm.title.value || ""}
+                  onChange={inputChangeHandler}
+                  error={!!offerForm.title.error}
+                  helperText={
+                    offerForm.title.error ||
+                    "Enter a clear, concise title for your tender offer"
+                  }
                   required
-                >
-                  <InputLabel>Currency</InputLabel>
-                  <Select
-                    name="currency"
-                    value={offerForm.currency.value as string}
-                    onChange={handleSelectChange}
-                    input={<OutlinedInput label="Currency" />}
-                  >
-                    {currencyOptions.map((option) => (
-                      <MenuItem key={option.code} value={option.code}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
+                />
+                {availableStates.length > 0 && (
+                  <Autocomplete
+                    fullWidth
+                    value={{
+                      name: String(offerForm.location.value),
+                      isoCode: "",
+                    }}
+                    options={availableStates}
+                    getOptionLabel={(option) => String(option.name)}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="State/Province"
+                        error={!!offerForm.location.error}
+                        helperText={offerForm.location.error}
+                      />
+                    )}
+                    onChange={(_, state) => {
+                      if (state) {
+                        setOfferForm((prev) => ({
+                          ...prev,
+                          location: { value: state.name ?? "", error: "" },
+                        }));
+                      }
+                    }}
+                    sx={{ mb: 2 }}
+                  />
+                )}
                 <FormControl
                   sx={{ flexGrow: 1, minWidth: "200px" }}
                   error={!!offerForm.sector.error}
@@ -788,6 +793,45 @@ const TenderOffers: React.FC = () => {
                         : "Select minimum qualification required for bidders"}
                     </FormHelperText>
                   )}
+                </FormControl>
+              </Box>
+
+              <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                <FormControl sx={{ flexGrow: 1, minWidth: "200px" }}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Budget"
+                    name="budget"
+                    value={offerForm.budget.value || ""}
+                    onChange={inputChangeHandler}
+                    error={!!offerForm.budget.error}
+                    helperText={
+                      offerForm.budget.error ||
+                      "Specify the budget allocated for this tender"
+                    }
+                    required
+                  />
+                </FormControl>
+
+                <FormControl
+                  sx={{ flexGrow: 1, minWidth: "200px" }}
+                  error={!!offerForm.currency.error}
+                  required
+                >
+                  <InputLabel>Currency</InputLabel>
+                  <Select
+                    name="currency"
+                    value={offerForm.currency.value as string}
+                    onChange={handleSelectChange}
+                    input={<OutlinedInput label="Currency" />}
+                  >
+                    {currencyOptions.map((option) => (
+                      <MenuItem key={option.code} value={option.code}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
                 </FormControl>
               </Box>
             </Box>
@@ -1042,6 +1086,12 @@ const TenderOffers: React.FC = () => {
           </Box>
         </CardContent>
       </Card>
+      <Backdrop
+        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        open={isSubmitting}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
     </Box>
   );
 };

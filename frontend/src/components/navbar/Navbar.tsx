@@ -23,6 +23,8 @@ import {
   Tooltip,
   Alert,
   Collapse,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import LoginIcon from "@mui/icons-material/Login";
@@ -41,7 +43,7 @@ import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import { useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { UserProps } from "../../types";
-import { useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Logout } from "@mui/icons-material";
 import { useEthers } from "@usedapp/core";
 
@@ -111,7 +113,7 @@ const SearchDrawer = styled(Drawer)(({ theme }) => ({
 }));
 
 type NavbarProps = {
-  user: UserProps;
+  user: UserProps | undefined;
   isAuth: boolean;
   handleLogout: () => void;
   toggleDarkMode: () => void;
@@ -134,6 +136,7 @@ const Navbar: React.FC<NavbarProps> = ({
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [showNetworkWarning, setShowNetworkWarning] = useState(false);
   const userSettingsOpen = Boolean(anchorEl);
+  const { pathname } = useLocation();
   const navbarRef = useRef<HTMLDivElement | null>(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -371,7 +374,7 @@ const Navbar: React.FC<NavbarProps> = ({
               <ListItemIcon>
                 <PersonIcon color="primary" />
               </ListItemIcon>
-              <ListItemText primary={user.email} secondary="My Account" />
+              <ListItemText primary={user?.email} secondary="My Account" />
             </ListItemButton>
             <ListItemButton onClick={handleLogout}>
               <ListItemIcon>
@@ -483,25 +486,52 @@ const Navbar: React.FC<NavbarProps> = ({
           </Box>
         </Box>
 
-        <Box sx={{ display: "flex", width: "50%" }}>
-          <form onSubmit={handleSearchSubmit} style={{ width: "100%" }}>
-            <Box sx={{ display: "flex", gap: 2 }}>
-              <TextField
-                size="small"
-                label="Search Contracts"
-                variant="outlined"
-                fullWidth
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                }}
-              />
-            </Box>
-          </form>
-          <IconButton>
-            <SearchIcon />
-          </IconButton>
-        </Box>
+        <Tabs
+          value={pathname.split("/")[1]}
+          textColor="primary"
+          indicatorColor="primary"
+          sx={{ marginLeft: 4 }}
+        >
+          <Tab
+            label="Offers"
+            component={NavLink}
+            to="/offers"
+            value="offers"
+            sx={{
+              px: 2,
+              "&.active": {
+                fontWeight: "bold",
+                color: "secondary.main",
+              },
+            }}
+          />
+          <Tab
+            label="Transactions"
+            component={NavLink}
+            to="transactions"
+            value="/transactions"
+            sx={{
+              px: 2,
+              "&.active": {
+                fontWeight: "bold",
+                color: "secondary.main",
+              },
+            }}
+          />
+          <Tab
+            label="Account"
+            component={NavLink}
+            to="/account"
+            value="account"
+            sx={{
+              px: 2,
+              "&.active": {
+                fontWeight: "bold",
+                color: "secondary.main",
+              },
+            }}
+          />
+        </Tabs>
 
         <Box sx={{ display: "flex", alignItems: "center" }}>
           {isAuth ? (
@@ -515,18 +545,6 @@ const Navbar: React.FC<NavbarProps> = ({
               >
                 {account ? (
                   <Box sx={{ display: "flex", alignItems: "center" }}>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        mr: 1,
-                        display: "inline-flex",
-                        alignItems: "center",
-                      }}
-                    >
-                      {`${account.substring(0, 6)}...${account.substring(
-                        account.length - 4
-                      )}`}
-                    </Typography>
                     {showNetworkWarning && (
                       <Tooltip title="Wrong network. Click to switch to Hardhat">
                         <IconButton
@@ -550,9 +568,6 @@ const Navbar: React.FC<NavbarProps> = ({
                     Connect Wallet
                   </Button>
                 )}
-                <Button href="/transactions" variant="text">
-                  ETH
-                </Button>
                 <Tooltip title="Account settings">
                   <IconButton
                     onClick={handleClickUserSettings}
@@ -606,7 +621,7 @@ const Navbar: React.FC<NavbarProps> = ({
               >
                 <MenuItem
                   onClick={() => {
-                    navigate(`/profile/${user.ID}`);
+                    navigate(`/profile/${user?.ID}`);
                     handleCloseUserSettings();
                   }}
                 >
@@ -626,7 +641,7 @@ const Navbar: React.FC<NavbarProps> = ({
                   </ListItemIcon>
                   My Account
                 </MenuItem>
-                {user.Roles.some((role) => role.name === "admin") && (
+                {user?.Roles.some((role) => role.name === "admin") && (
                   <MenuItem
                     onClick={() => {
                       navigate(`/admin`);

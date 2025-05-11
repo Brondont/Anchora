@@ -18,7 +18,7 @@ const Footer: React.FC = () => {
   return (
     <Box
       sx={{
-        bgcolor: "primary.dark",
+        bgcolor: "primary.main",
         color: "primary.contrastText",
         py: 6,
         position: "relative",

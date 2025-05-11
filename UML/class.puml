@@ -1,17 +1,16 @@
-@startuml
+@startuml class-diagram
 left to right direction
-skinparam linetype ortho
 skinparam ArrowFontSize 10
 
 ' -- Base User and Derived Roles --
 class User {
-  +ID: uint
+  +id: uint
   +firstName: string
   +lastName: string
   +email: string
   +password: string
   +phoneNumber: string
-  +accountActivationHash: string
+  +publicWalletAddress: string
   +isActive: boolean
   +createdAt: time.Time
   +updatedAt: time.Time
@@ -29,145 +28,133 @@ class Entrepreneur {
   +viewOffers()
 }
 
-class TenderAdministrator {
+class Tender {
   +createOffer()
   +manageOffers()
 }
 
-' Expanded Expert with proof-of-stake and blockchain identity properties
 class Expert {
-  +specialization: string
-  +stakeAmount: float
-  +stakeWeight: float
-  +nodeReputation: float
-  +yearsExperience: int
-  +nodeID: string
   +evaluateProposal()
-  +updateStake(amount: float)
-  +calculateStakeWeight(): float
-  +updateReputation(score: float)
 }
 
 class Role {
-  +ID: uint
+  +id: uint
   +name: string
+  +roleTxHash: string        
   +createdAt: time.Time
   +updatedAt: time.Time
   +deletedAt: time.Time
 }
 
 ' -- Business Entities --
-class Offer {
-  +ID: uint
-  +title: string
+class Sector {
+  +id: uint
+  +code: string
   +description: string
-  +budget: float
-  +currency: string
-  +category: string
-  +location: string
-  +bidDeadline: time.Time
-  +contractStart: time.Time
+  +createdAt: time.Time
+  +updatedAt: time.Time
+  +deletedAt: time.Time
+}
+
+class Offer {
+  +id: uint
+  +tenderNumber: string
+  +contractAddress: string
+  +proposalSubmissionStart: time.Time
+  +proposalSubmissionEnd: time.Time
+  +proposalReviewStart: time.Time
+  +proposalReviewEnd: time.Time
+  +minQualificationLevel: string
   +status: string
-  +winningProposalID: uint
   +createdBy: uint
+  +sectorID: uint
   +createdAt: time.Time
   +updatedAt: time.Time
   +deletedAt: time.Time
 }
 
 class Proposal {
-  +ID: uint
-  +offerID: uint
-  +entrepreneurID: uint
-  +technicalProposal: string     
-  +financialOffer: float         
-  +timeline: string              
-  +requiredManpower: int         
-  +bidBondAmount: float            
-  +pastExperience: string          
+  +id: uint
+  +contractID: uint
+  +proposerID: uint
+  +details: string
   +status: string
   +submittedAt: time.Time
-  +finalScore: float
-  +dataCID: string   // IPFS content identifier for proposal data
+  +proposalTxHash: string   
   +createdAt: time.Time
   +updatedAt: time.Time
   +deletedAt: time.Time
 }
 
-' BlockchainVote records on-chain votes with a transaction hash for traceability
-class BlockchainVote {
-  +ID: uint
+class ExpertEvaluation {
+  +id: uint
   +proposalID: uint
   +expertID: uint
-  +voteScore: float
-  +comments: string
-  +weight: float
-  +txHash: string   // Blockchain transaction hash for the vote
-  +evaluatedAt: time.Time
+  +score: float
+  +comment: string
+  +reviewTxHash: string     
   +createdAt: time.Time
   +updatedAt: time.Time
   +deletedAt: time.Time
 }
 
-' Document stores files with an IPFS CID for decentralized storage
+class Qualification {
+  +id: uint
+  +sectorID: uint
+  +level: string
+  +createdAt: time.Time
+  +updatedAt: time.Time
+  +deletedAt: time.Time
+}
+
+class UserQualification {
+  +id: uint
+  +userID: uint
+  +qualificationID: uint
+  +createdAt: time.Time
+  +updatedAt: time.Time
+  +deletedAt: time.Time
+}
+
 class Document {
-  +ID: uint
-  +name: string
-  +url: string
-  +ipfsCID: string   // IPFS content identifier
+  +id: uint
+  +documentType: string
+  +documentPath: string
   +documentableID: uint
   +documentableType: string
-  +size: int
-  +fileType: string
-  +uploadedBy: uint
   +createdAt: time.Time
   +updatedAt: time.Time
   +deletedAt: time.Time
-}
-
-class OfferRules {
-  +ID: uint
-  +name: string
-  +description: string
-  +createdAt: time.Time
-  +updatedAt: time.Time
-  +deletedAt: time.Time
-}
-
-' OfferContract represents the on-chain smart contract that formalizes an offer’s terms
-class OfferContract {
-  +ID: uint
-  +offerID: uint
-  +winningProposalID: uint
-  +terms: string
-  +contractAddress: string
-  +txHash: string   // Blockchain transaction hash for contract deployment
-  +status: string
-  +createdAt: time.Time
-  +updatedAt: time.Time
 }
 
 ' -- Inheritance --
 User <|-- Admin
 User <|-- Entrepreneur
-User <|-- TenderAdministrator
+User <|-- Tender
 User <|-- Expert
 
-' -- Associations between User and Role --
-User "*" -- "*" Role
+' -- Associations --
+User "*" -- "*" Role                  : has
+Role "*" -- "*" User                  : assignedTo
 
-' -- Associations for Tender and Voting Process --
-TenderAdministrator "1" -- "*" Offer : creates
-Entrepreneur "1" -- "*" Proposal : submits
-Offer "1" -- "*" Proposal : receives
-Expert "1" -- "*" BlockchainVote : casts
-Proposal "1" -- "*" BlockchainVote : evaluatedBy
+User "1" -- "*" UserQualification      : qualifications
+UserQualification "*" -- "1" Qualification : refersTo
+UserQualification "1" -- "*" Document      : evidence
 
-Offer "1" -- "1" OfferContract : finalizes
+Tender "1" -- "*" Offer  : creates
+User "1" -- "*" Offer                 : createdOffers
+Offer "*" -- "1" Sector               : belongsTo
+Sector "1" -- "*" Qualification       : defines
 
-Offer "*" -- "*" OfferRules
-Document "*" -- "1" Offer : attachedTo
-Document "*" -- "1" Proposal : attachedTo
-Document "*" -- "1" User : uploadedBy
+Entrepreneur "1" -- "*" Proposal      : submits
+Offer "1" -- "*" Proposal             : receives
+Proposal "1" -- "*" Document          : attachments
+
+Expert "1" -- "*" ExpertEvaluation    : evaluates
+Proposal "1" -- "*" ExpertEvaluation  : evaluatedBy
+ExpertEvaluation "*" -- "1" Expert    : expert
+
+Offer "1" -- "*" Document             : attachments
+Offer "*" -- "1" Qualification : MinQualification
 
 @enduml

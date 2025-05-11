@@ -1,0 +1,58 @@
+@startuml account_creation_sequence
+
+actor Admin
+participant "Admin Frontend" as Frontend
+participant "Server" as Server
+participant "Google SMTP" as SMTP
+database "Database" as DB
+
+title Account Creation Process
+
+== Normal Flow ==
+Admin -> Frontend: Input new user data\n(name, email, role, etc.)
+Frontend -> Server: POST /api/v1/user
+activate Server
+
+Server -> Server: Validate user data
+alt Data is valid
+    Server -> DB: Check if email already exists
+    
+    alt Email not found
+        Server -> DB: Store user data with\n"pending" status
+        DB --> Server: Confirm storage
+        Server -> SMTP: Request email activation link
+        activate SMTP
+        SMTP --> Server: Confirm email request accepted
+        deactivate SMTP
+        Server --> Frontend: 201 Created (User pending activation)
+        Frontend --> Admin: Display success message\nwith pending activation notice
+    else Email already exists
+        Server --> Frontend: 409 Conflict (Email already exists)
+        Frontend --> Admin: Show error: "Email already registered"
+    end
+else Data is invalid
+    Server --> Frontend: 400 Bad Request (Invalid data)
+    Frontend --> Admin: Display validation errors
+end
+
+deactivate Server
+
+== Email Sending Failure Scenario ==
+Admin -> Frontend: Input new user data
+Frontend -> Server: POST /api/v1/user
+activate Server
+Server -> Server: Validate user data
+Server -> DB: Check if email already exists
+DB --> Server: Email not found
+Server -> DB: Store user data with\n"pending" status
+DB --> Server: Confirm storage
+Server -> SMTP: Request email activation link
+activate SMTP
+SMTP --> Server: Email service error
+deactivate SMTP
+Server -> Server: Log email failure
+Server --> Frontend: 201 Created with warning\n(User created but email failed)
+Frontend --> Admin: Show success with warning:\n"User created but activation email failed.\nTry resending later."
+deactivate Server
+
+@enduml

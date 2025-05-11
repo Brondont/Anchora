@@ -1,0 +1,41 @@
+@startuml entrepreneur-usecase
+left to right direction
+skinparam ArrowFontSize 10
+
+' -- Actors --
+actor "Entrepreneur" as Entrepreneur
+actor "Metamask Wallet" as Metamask <<external system>>
+rectangle "Blockchain" as Blockchain <<external system>>
+
+' -- Use Cases --
+usecase "Submit Proposal" as SubmitProposal
+usecase "Withdraw Proposal" as WithdrawProposal
+usecase "Browse Contracts" as BrowseContracts
+usecase "View Proposal Rank" as ViewRank
+usecase "Administrative Document" as AdminDoc
+usecase "Technical Document" as TechDoc
+usecase "Financial Document" as FiDoc
+usecase "Authenticate & Sign\n(via Metamask)" as AuthMeta
+usecase "Push Submission" as PushProposal
+
+' -- Actor-Use Case Links --
+Entrepreneur --> SubmitProposal
+Entrepreneur --> WithdrawProposal
+Entrepreneur --> BrowseContracts
+Entrepreneur --> ViewRank
+
+' -- Include and Extend Relationships --
+SubmitProposal ..> AuthMeta : <<include>>
+SubmitProposal ..> PushProposal : <<include>>
+SubmitProposal ..> AdminDoc: <<include>>
+SubmitProposal ..> TechDoc: <<include>>
+SubmitProposal ..> FiDoc: <<include>>
+
+WithdrawProposal ..> AuthMeta : <<include>>
+
+' -- Blockchain connections --
+PushProposal <-- Blockchain
+WithdrawProposal <-- Blockchain
+Metamask --> AuthMeta
+
+@enduml

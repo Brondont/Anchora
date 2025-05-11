@@ -23,12 +23,16 @@ import PasswordResetPage from "./pages/PasswordResetPage";
 import TransactionTestPage from "./pages/TransactionsTestPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import { useEthers } from "@usedapp/core";
+import OffersPage from "./pages/OffersPage";
+import OfferPage from "./pages/OfferPage";
+import hasRole from "./util/hasRole";
+import ProposalCreationPage from "./pages/entrepreneur/ProposalCreationPage";
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isAuth, setIsAuth] = useState<boolean>(false);
   const { deactivate } = useEthers();
-  const [user, setUser] = useState<UserProps>({
+  const [user, setUser] = useState<UserProps | undefined>({
     ID: 0,
     CreatedAt: "",
     UpdatedAt: "",
@@ -55,6 +59,7 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     setIsAuth(false);
+    setUser(undefined);
     localStorage.removeItem("token");
     localStorage.removeItem("userID");
     localStorage.removeItem("publicWalletAddress");
@@ -167,6 +172,10 @@ const App: React.FC = () => {
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<PasswordResetPage />} />
               <Route path="/activation" element={<AccountActivationPage />} />
+              <Route path="/offers">
+                <Route index element={<OffersPage />} />
+                <Route path=":offerID" element={<OfferPage user={user} />} />
+              </Route>
 
               {!isAuth ? (
                 <>
@@ -197,13 +206,22 @@ const App: React.FC = () => {
                       />
                     }
                   />
-                  {user.Roles.some((role: Role) => role.name === "admin") && (
+                  {hasRole(user, "admin") && (
                     <Route
                       path="/admin/*"
                       element={
                         <AdminSpace user={user} handleLogout={handleLogout} />
                       }
                     />
+                  )}
+                  {(hasRole(user, "entrepreneur") ||
+                    hasRole(user, "tender")) && (
+                    <Route path="/proposals">
+                      <Route
+                        path="submit/:offerID"
+                        element={<ProposalCreationPage user={user} />}
+                      />
+                    </Route>
                   )}
                 </>
               )}

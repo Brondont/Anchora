@@ -3,7 +3,10 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/Brondont/trust-api/config"
 	"github.com/Brondont/trust-api/db"
@@ -348,5 +351,100 @@ func (h *GeneralHandler) GetSectors(w http.ResponseWriter, r *http.Request) {
 	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
 		"message": "Sectors fetched successfully",
 		"sectors": sectors,
+	})
+}
+
+func (h *GeneralHandler) GetOffers(w http.ResponseWriter, r *http.Request) {
+	// 1. Parse query params
+	q := r.URL.Query()
+	page, _ := strconv.Atoi(q.Get("page"))
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	search := strings.TrimSpace(q.Get("search"))
+	sector := strings.TrimSpace(q.Get("sector"))
+	location := strings.TrimSpace(q.Get("location"))
+
+	// 2. Apply defaults
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+
+	// 3. Build base query with preloads
+	baseQuery := db.DB.DB.
+		Model(&models.Offer{}).
+		Preload("Sector").
+		Preload("Creator").Where("status <> ?", "Closed")
+
+	// 4. Apply filters
+	if search != "" {
+		pattern := "%" + strings.ToLower(search) + "%"
+		baseQuery = baseQuery.Where(
+			"LOWER(title) LIKE ?",
+			pattern,
+		)
+	}
+	if sector != "" {
+		// join on sectors.code
+		baseQuery = baseQuery.
+			Joins("JOIN sectors ON sectors.id = offers.sector_id").
+			Where("sectors.code = ?", sector)
+	}
+	if location != "" {
+		// assuming offers have a `location` column
+		baseQuery = baseQuery.Where("LOWER(location) LIKE ?", "%"+strings.ToLower(location)+"%")
+	}
+
+	// 5. Count total items
+	var totalItems int64
+	if err := baseQuery.Count(&totalItems).Error; err != nil {
+		utils.WriteError(w, http.StatusInternalServerError,
+			fmt.Errorf("failed to count offers: %w", err))
+		return
+	}
+
+	// 6. Fetch paginated results
+	offset := (page - 1) * limit
+	var offers []models.Offer
+	if err := baseQuery.
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&offers).Error; err != nil {
+		utils.WriteError(w, http.StatusInternalServerError,
+			errors.New("something went wrong getting offers, try again"))
+		return
+	}
+
+	// 7. Compute total pages
+	totalPages := int(math.Ceil(float64(totalItems) / float64(limit)))
+
+	// 8. Write JSON response
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"message":      "Successfully fetched offers",
+		"offers":       offers,
+		"currentPage":  page,
+		"totalPages":   totalPages,
+		"totalItems":   totalItems,
+		"itemsPerPage": limit,
+	})
+}
+
+func (h *GeneralHandler) GetOffer(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	offerID := vars["offerID"]
+
+	var offer models.Offer
+
+	result := db.DB.DB.Preload("Documents").Preload("Sector").Where("id = ?", offerID).Find(&offer)
+	if result.Error != nil {
+		utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to fetch requsted offer"))
+		return
+	}
+
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"message": "fetched offer successfully",
+		"offer":   offer,
 	})
 }

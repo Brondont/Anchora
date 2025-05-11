@@ -127,3 +127,21 @@ func RequireRole(next http.HandlerFunc, requiredRoles ...string) http.HandlerFun
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 }
+
+func RequireRoleHandler(next http.Handler, requiredRoles ...string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, err := ValidateAuthToken(r)
+		if err != nil {
+			utils.WriteError(w, http.StatusUnauthorized, err)
+			return
+		}
+		if !HasRole(claims, requiredRoles) {
+			utils.WriteError(w, http.StatusForbidden, errors.New("insufficient permissions"))
+			return
+		}
+		// Set userID and claims in context for downstream handlers
+		ctx := context.WithValue(r.Context(), "userID", claims.UserID)
+		ctx = context.WithValue(ctx, "claims", claims)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}

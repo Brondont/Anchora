@@ -26,6 +26,7 @@ type OfferFormData struct {
 	ContractAddress         string
 	Title                   string
 	Budget                  float64
+	Location                string
 	Currency                string
 	SectorID                uint
 	TenderNumber            string
@@ -170,7 +171,7 @@ func ValidateOfferForm(formData map[string][]string) (OfferFormData, []InputVali
 	result := OfferFormData{}
 
 	// Validate required fields
-	requiredFields := []string{"contractAddress", "title", "budget", "currency", "sectorID",
+	requiredFields := []string{"contractAddress", "title", "budget", "currency", "sectorID", "location",
 		"proposalSubmissionStart", "proposalSubmissionEnd", "proposalReviewStart", "proposalReviewEnd"}
 
 	for _, field := range requiredFields {
@@ -191,6 +192,7 @@ func ValidateOfferForm(formData map[string][]string) (OfferFormData, []InputVali
 	result.ContractAddress = formData["contractAddress"][0]
 	result.Title = formData["title"][0]
 	result.Currency = formData["currency"][0]
+	result.Location = formData["location"][0]
 
 	// Parse budget
 	if budget, err := strconv.ParseFloat(formData["budget"][0], 64); err != nil {

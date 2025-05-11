@@ -1,96 +1,97 @@
-@startuml
+@startuml usecase-diagram
+left to right direction
+skinparam ArrowFontSize 10
 
-' Define Actors
+' -- Actors --
 actor "System Administrator" as Admin
-actor "Entrepreneur" as Entrepreneur
-actor "Expert" as Expert
-actor "Automated Auditor" as Auditor
+actor "Entrepreneur"         as Entrepreneur
+actor "Expert"               as Expert
+actor "Automated Auditor"    as Auditor
+actor "Metamask Wallet"      as Metamask <<external system>>  <!-- External wallet actor :contentReference[oaicite:0]{index=0} -->
 
-' External system for immutable record-keeping
-rectangle "Blockchain" as Blockchain <<external system>>
+rectangle "Blockchain" as Blockchain <<external system>>      <!-- Immutable ledger actor :contentReference[oaicite:1]{index=1} -->
 
-' Group Contract Management Use Cases
-  usecase "Create Contract" as CreateContract
-  usecase "Update Contract" as UpdateContract
-  usecase "Set Contract Deadline" as OfferDeadline
-  usecase "Attach Documentation" as OfferDocs
-  usecase "Define Contract Conditions" as OfferConditions
-  usecase "Browse Contracts" as BrowseContracts
+' -- Shared Authentication --
+usecase "Authenticate & Sign\n(via Metamask)" as AuthMeta       <!-- Shared Metamask signing use case :contentReference[oaicite:2]{index=2} -->
 
-' Group User Management Use Cases
-  usecase "Manage Users" as CRUDUser
-  usecase "Attach Certificates" as UserCertificates
+' -- Contract Management --
+usecase "Create Contract"      as CreateContract                  
+usecase "Update Contract"      as UpdateContract                 
+usecase "Set Contract Deadline"as OfferDeadline                 
+usecase "Attach Documentation" as OfferDocs                      
+usecase "Define Contract Conditions" as OfferConditions         
+usecase "Browse Contracts"     as BrowseContracts                
 
-' Group Bid Management Use Cases
-  usecase "Submit Bid" as SubmitBid
-  usecase "Withdraw Bid" as WithdrawBid
-  usecase "View Bid Rank" as ViewRank
+' -- User Management --
+usecase "Manage Users"         as CRUDUser                        
+usecase "Attach Certificates"  as UserCertificates                
 
-' Group Evaluation Use Cases
-  usecase "Evaluate Bid" as EvaluateBid
-  usecase "Evaluate Contract" as EvaluateContract
-  usecase "Classify Bid" as ClassifyBid
-  usecase "Audit Evaluations" as AuditEval
+' -- Bid Management --
+usecase "Submit Bid"           as SubmitBid                     
+usecase "Withdraw Bid"         as WithdrawBid                   
+usecase "View Bid Rank"        as ViewRank                      
 
-' Group Blockchain Operations
-  usecase "Push Contract" as PushContract
-  usecase "Push Profile" as PushProfile
-  usecase "Push Submission" as PushBid
+' -- Evaluation Management --
+usecase "Evaluate Bid"         as EvaluateBid                   
+usecase "Evaluate Contract"    as EvaluateContract              
+usecase "Classify Bid"         as ClassifyBid                   
+usecase "Audit Evaluations"    as AuditEval                     
 
-'-------------------------
-' Actor-to-Use Case Connections
-'-------------------------
-' System Administrator interactions
-Admin --> CreateContract
-Admin --> UpdateContract
-Admin --> CRUDUser
+' -- Blockchain Operations --
+usecase "Push Contract"        as PushContract                  
+usecase "Push Submission"      as PushBid                       
+usecase "Push Evaluation"      as PushEval                       <!-- Expert evaluations on-chain :contentReference[oaicite:3]{index=3} -->
 
-' Entrepreneur interactions
+' -- Actor–Use Case Links --
+Admin        --> CreateContract
+Admin        --> UpdateContract
+Admin        --> CRUDUser
+
 Entrepreneur --> SubmitBid
 Entrepreneur --> WithdrawBid
 Entrepreneur --> BrowseContracts
 Entrepreneur --> ViewRank
 
-' Expert interactions
-Expert --> EvaluateBid
-Expert -right-> EvaluateContract
+Expert       --> EvaluateBid
+Expert       --> EvaluateContract
 
-' Automated Auditor interaction
-Auditor --> AuditEval
+Auditor      --> AuditEval
 
-'-------------------------
-' Use Case Relationships
-'-------------------------
-' Contract Management includes validations and details
-CreateContract ..> OfferDeadline : <<include>>
-CreateContract ..> OfferDocs : <<include>>
-CreateContract ..> OfferConditions : <<include>>
-CreateContract ..> EvaluateContract : <<include>>
+Metamask     --> AuthMeta
 
-UpdateContract ..> EvaluateContract : <<include>>
+' -- Include Authentication in all relevant flows --
+CreateContract ..> AuthMeta : <<include>>
+UpdateContract ..> AuthMeta : <<include>>
+CRUDUser       ..> AuthMeta : <<include>>                                      
+SubmitBid      ..> AuthMeta : <<include>>                                      
+WithdrawBid    ..> AuthMeta : <<include>>                                      
+EvaluateBid    ..> AuthMeta : <<include>>                                      
+EvaluateContract ..> AuthMeta : <<include>>                                  
+PushContract   ..> AuthMeta : <<include>>                                      
+PushBid        ..> AuthMeta : <<include>>                                      
+PushEval       ..> AuthMeta : <<include>>                                      
 
-' User Management extension
-CRUDUser <.. UserCertificates : <<extend>>
+' -- Existing business process includes --
+CreateContract ..> OfferDeadline       : <<include>>
+CreateContract ..> OfferDocs           : <<include>>
+CreateContract ..> OfferConditions     : <<include>>
+CreateContract ..> EvaluateContract    : <<include>>
 
-' Bid Management includes validation
-SubmitBid ..> EvaluateBid : <<include>>
+UpdateContract ..> EvaluateContract    : <<include>>
 
-' Evaluation process: Validation triggers classification, which then undergoes auditing
-EvaluateBid ..> ClassifyBid : <<include>>
-ClassifyBid ..> AuditEval : <<include>>
-AuditEval ..> PushBid : <<include>>
+CRUDUser       <.. UserCertificates    : <<extend>>
 
-' Contract validation triggers blockchain update
-EvaluateContract ..> PushContract : <<include>>
+SubmitBid      ..> EvaluateBid         : <<include>>
+EvaluateBid    ..> ClassifyBid         : <<include>>
+ClassifyBid    ..> AuditEval           : <<include>>
+AuditEval      ..> PushEval            : <<include>>                      <!-- Audited evaluations recorded on-chain :contentReference[oaicite:4]{index=4} -->
 
-' User management triggers blockchain profile push
-CRUDUser ..> PushProfile : <<include>>
+EvaluateContract ..> PushContract      : <<include>>                      
+AuditEval          ..> PushEval         : <<include>>                      
 
-'-------------------------
-' Blockchain Connections
-'-------------------------
-PushContract <-- Blockchain
-PushProfile <-- Blockchain
-PushBid <-- Blockchain
+' -- Blockchain connections --
+PushContract  <-- Blockchain
+PushBid       <-- Blockchain
+PushEval      <-- Blockchain
 
 @enduml

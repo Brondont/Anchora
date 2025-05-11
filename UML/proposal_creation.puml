@@ -1,0 +1,107 @@
+@startuml proposal_creation_sequence
+
+actor Contractor
+participant "Contractor Frontend" as Frontend
+participant "MetaMask" as MetaMask
+participant "Smart Contract\n(OfferFactory)" as Contract
+participant "Blockchain" as Blockchain
+participant "Server" as Server
+database "Database" as DB
+
+title Proposal Creation Process
+
+== Normal Flow ==
+Contractor -> Frontend: Browse available offers
+Frontend -> Server: GET /api/v1/offers
+activate Server
+Server -> DB: Retrieve active offers
+DB --> Server: Return offers data
+Server --> Frontend: 200 OK with offers list
+deactivate Server
+Frontend --> Contractor: Display available offers
+Contractor -> Frontend: Select offer and create proposal
+Frontend -> Frontend: Display proposal form
+Contractor -> Frontend: Fill proposal details
+Frontend -> Frontend: Validate proposal data
+alt Proposal data valid
+    Frontend -> MetaMask: Request transaction signature
+    activate MetaMask
+    MetaMask -> Contractor: Prompt to sign transaction
+    Contractor -> MetaMask: Confirm and sign
+    MetaMask -> Contract: Send signed transaction
+    activate Contract
+    Contract -> Blockchain: Submit transaction
+    activate Blockchain
+    Blockchain --> Contract: Transaction included in block
+    deactivate Blockchain
+    Contract --> MetaMask: Return transaction hash
+    deactivate Contract
+    MetaMask --> Frontend: Return transaction success
+    deactivate MetaMask
+    Frontend -> Server: POST /api/v1/entrepreneur/proposal
+    note right: Includes transaction hash\nand proposal details
+    activate Server
+    Server -> Blockchain: Verify transaction confirmation
+    Blockchain --> Server: Confirm transaction
+    Server -> Server: Validate proposal against offer requirements
+    Server -> DB: Store proposal details
+    DB --> Server: Confirm storage
+    Server --> Frontend: 201 Created (Proposal submitted)
+    Frontend --> Contractor: Display success message
+    deactivate Server
+else Proposal data invalid
+    Frontend --> Contractor: Display validation errors
+end
+
+== Offer Deadline Passed Scenario ==
+Contractor -> Frontend: Select expired offer
+Frontend -> Server: GET /api/v1/offer/{offerID}
+activate Server
+Server -> DB: Check offer status and deadline
+DB --> Server: Return offer with passed deadline
+Server --> Frontend: 200 OK with offer marked as expired
+deactivate Server
+Frontend -> Frontend: Detect expired offer
+Frontend --> Contractor: Display "Offer deadline has passed" message
+Frontend -> Frontend: Disable proposal submission
+
+== Blockchain Reverted Transaction ==
+Contractor -> Frontend: Fill proposal details
+Frontend -> MetaMask: Request transaction signature
+activate MetaMask
+Contractor -> MetaMask: Confirm and sign
+MetaMask -> Contract: Send signed transaction
+activate Contract
+Contract -> Contract: Validate proposal against contract rules
+Contract -> Blockchain: Submit transaction
+activate Blockchain
+Blockchain -> Blockchain: Execute transaction
+Blockchain --> Contract: Transaction reverted (e.g., offer closed on-chain)
+deactivate Blockchain
+Contract --> MetaMask: Return transaction failure
+deactivate Contract
+MetaMask --> Frontend: Transaction failed
+deactivate MetaMask
+Frontend --> Contractor: Display "Proposal rejected by smart contract" message
+Frontend -> Server: GET /api/v1/offer/{offerID}
+activate Server
+Server -> Blockchain: Check latest offer status
+Blockchain --> Server: Offer status (closed)
+Server -> DB: Update offer status
+DB --> Server: Confirm update
+Server --> Frontend: Updated offer status
+deactivate Server
+Frontend --> Contractor: Update UI to show offer as closed
+
+== Duplicate Proposal Detection ==
+Contractor -> Frontend: Fill proposal details
+Frontend -> Server: Check if contractor already submitted proposal
+activate Server
+Server -> DB: Query existing proposals
+DB --> Server: Return existing proposal by same contractor
+Server --> Frontend: 409 Conflict (Proposal already exists)
+deactivate Server
+Frontend --> Contractor: Display "You've already submitted a proposal for this offer" message
+Frontend -> Frontend: Offer option to view existing proposal
+
+@enduml

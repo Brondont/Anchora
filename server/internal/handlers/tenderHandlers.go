@@ -72,6 +72,7 @@ func (h *TenderHandler) PostOffer(w http.ResponseWriter, r *http.Request) {
 	offerPayload := models.Offer{
 		Title:                   offerForm.Title,
 		TenderNumber:            offerForm.TenderNumber,
+		Location:                offerForm.Location,
 		Description:             offerForm.Description,
 		Budget:                  offerForm.Budget,
 		Currency:                offerForm.Currency,
@@ -96,7 +97,7 @@ func (h *TenderHandler) PostOffer(w http.ResponseWriter, r *http.Request) {
 
 	// Process uploaded files
 	for _, fileHeader := range formData.Files {
-		documentPath, err := utils.SaveUploadedFile(fileHeader, "/public/offers")
+		documentPath, err := utils.SaveUploadedFile(fileHeader, "/authenticated/offers")
 		if err != nil {
 			tx.Rollback()
 			utils.WriteError(w, http.StatusInternalServerError, err)
